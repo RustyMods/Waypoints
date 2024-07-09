@@ -1,5 +1,4 @@
 ﻿using System.Collections.Generic;
-using System.Linq;
 using BepInEx;
 using HarmonyLib;
 using SoftReferenceableAssets;
@@ -10,24 +9,16 @@ namespace Waypoints.Managers;
 
 public class LocationManager
 {
-    public static readonly Dictionary<string, LocationData> m_locations = new();
-
+    private static readonly Dictionary<string, LocationData> m_locations = new();
     static LocationManager()
     {
         Harmony harmony = new Harmony("org.bepinex.helpers.RustyLocationManager");
         harmony.Patch(AccessTools.DeclaredMethod(typeof(ZoneSystem), nameof(ZoneSystem.SetupLocations)),
             prefix: new HarmonyMethod(AccessTools.DeclaredMethod(typeof(LocationManager), nameof(SetupLocations_Prefix))));
     }
-    
-    
-    private static void RegisterToZNetScene(ZNetScene __instance, GameObject prefab)
-    {
-        if (!__instance.m_prefabs.Contains(prefab)) __instance.m_prefabs.Add(prefab);
-        __instance.m_namedPrefabs[prefab.name.GetStableHashCode()] = prefab;
-    }
-
     private static void SetupLocations_Prefix(ZoneSystem __instance)
     {
+        if (WaypointsPlugin._generateLocations.Value is WaypointsPlugin.Toggle.Off) return;
         List<ZoneSystem.ZoneLocation> locations = new();
         foreach (var location in m_locations.Values)
         {
@@ -50,8 +41,8 @@ public class LocationManager
                 WaypointsPlugin.WaypointsLogger.LogDebug(data.m_prefabName + " is not valid");
             }
         }
-        WaypointsPlugin.WaypointsLogger.LogDebug("Added " + locations.Count + " locations");
         __instance.m_locations.AddRange(locations);
+        ZLog.Log($"Added {locations.Count} locations from Waypoints");
     }
 
     public class LocationData

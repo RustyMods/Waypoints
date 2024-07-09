@@ -36,6 +36,8 @@ namespace Waypoints
         public static AssetLoaderManager m_assetLoaderManager = null!;
 
         private static ConfigEntry<Toggle> _serverConfigLocked = null!;
+        public static ConfigEntry<Toggle> _generateLocations = null!;
+        public static ConfigEntry<Toggle> _usesCharges = null!;
         public static ConfigEntry<string> _chargeItem = null!;
         public static ConfigEntry<int> _chargeMax = null!;
         public static ConfigEntry<int> _chargeDecay = null!;
@@ -52,6 +54,8 @@ namespace Waypoints
             _serverConfigLocked = config("1 - General", "Lock Configuration", Toggle.On,
                 "If on, the configuration is locked and can be changed by server admins only.");
             _ = ConfigSync.AddLockingConfigEntry(_serverConfigLocked);
+            _generateLocations = config("2 - Settings", "Locations", Toggle.On, "If on, waypoints will generate along side game locations");
+            _usesCharges = config("2 - Settings", "Charge System", Toggle.On, "If on, waypoints use charge system");
             _chargeItem = config("2 - Settings", "Charge Item", "GreydwarfEye", "Set charge item");
             _chargeMax = config("2 - Settings", "Charge Max", 50, "Set max charge");
             _Decays = config("2 - Settings", "Charge Decays", Toggle.On, "If on, portal charge decays over time");
@@ -60,8 +64,7 @@ namespace Waypoints
             _TeleportAnything = config("2 - Settings", "Teleport Anything", Toggle.Off, "If on, player can teleport non-teleportable items");
             _UseKeys = config("2 - Settings", "Use Keys", Toggle.Off, "If on, portal checks if game has global key to allow teleportation of non-teleportable items");
             _TeleportTames = config("2 - Settings", "Teleport Tames", Toggle.Off, "If on, portal can teleport tames that are following player");
-            _onlyAdminRenames = config("2 - Settings", "Only Admin Renames", Toggle.Off,
-                "If on, only admins can rename waypoints");
+            _onlyAdminRenames = config("2 - Settings", "Only Admin Renames", Toggle.Off, "If on, only admins can rename waypoints");
         }
         
         private static AssetBundle GetAssetBundle(string fileName)
@@ -90,18 +93,20 @@ namespace Waypoints
 
         private void LoadLocations()
         {
-            LocationManager.LocationData WaypointLocation = new LocationManager.LocationData("WaypointLocation", _assetBundle, "WaypointShrine");
-            WaypointLocation.m_data.m_biome = Heightmap.Biome.All;
-            WaypointLocation.m_data.m_quantity = 40;
-            WaypointLocation.m_data.m_group = "Waypoints";
-            WaypointLocation.m_data.m_prefabName = "WaypointLocations";
-            WaypointLocation.m_data.m_prioritized = true;
-            WaypointLocation.m_data.m_minDistanceFromSimilar = 1500f;
-            WaypointLocation.m_data.m_iconPlaced = false;
-            WaypointLocation.m_data.m_iconAlways = false;
-            WaypointLocation.m_data.m_surroundCheckVegetation = true;
-            WaypointLocation.m_data.m_surroundCheckDistance = 100f;
-            WaypointLocation.m_data.m_surroundCheckLayers = LayerMask.GetMask("Default", "static_solid", "Default_small", "piece_nonsolid", "terrain", "vehicle", "piece", "viewblock");
+            LocationManager.LocationData WaypointLocation = new LocationManager.LocationData("WaypointLocation", _assetBundle, "WaypointShrine")
+                {
+                    m_data =
+                    {
+                        m_biome = Heightmap.Biome.All,
+                        m_quantity = 20,
+                        m_group = "Waypoints",
+                        m_prefabName = "WaypointLocation",
+                        m_prioritized = true,
+                        m_minDistanceFromSimilar = 1000f,
+                        m_surroundCheckVegetation = true,
+                        m_surroundCheckDistance = 10f,
+                    }
+                };
         }
         public void Awake()
         {
@@ -146,9 +151,9 @@ namespace Waypoints
                 WaypointsLogger.LogError("Please check your config entries for spelling and format!");
             }
         }
-        
 
-        public ConfigEntry<T> config<T>(string group, string name, T value, ConfigDescription description,
+
+        private ConfigEntry<T> config<T>(string group, string name, T value, ConfigDescription description,
             bool synchronizedSetting = true)
         {
             ConfigDescription extendedDescription =

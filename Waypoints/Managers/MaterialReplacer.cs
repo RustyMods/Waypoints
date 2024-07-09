@@ -123,13 +123,6 @@ namespace Waypoints.Managers
                     Debug.LogWarning("Failed to get material for " + renderer.name);
                 }
             }
-
-            // foreach (var VARIABLE in go.GetComponentsInChildren<ParticleSystemRenderer>(true))
-            // {
-            //     var newMaterials = VARIABLE.sharedMaterials.Select(material => ReplaceMaterial(material, isJotunnMock)).ToArray();
-            //     VARIABLE.sharedMaterials = newMaterials;
-            //     VARIABLE.material = ReplaceMaterial(VARIABLE.material, isJotunnMock);
-            // }
         }
 
         private static Material ReplaceMaterial(Material originalMaterial, bool isJotunnMock)
@@ -189,8 +182,7 @@ namespace Waypoints.Managers
                     return shader;
                 }
             }
-
-
+            
             return origShader;
         }
     }

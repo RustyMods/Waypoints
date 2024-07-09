@@ -26,7 +26,7 @@ public class Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
     private bool m_particlesActive = true;
     private float m_intensity;
     private static readonly Vector3 m_existDistance = new Vector3(1f, 1f, 1f);
-    private bool m_noMapMode;
+    private static bool m_noMapMode;
     private static bool m_teleporting;
     public static readonly List<Minimap.PinData> m_tempPins = new();
     private static readonly int EmissionColor = Shader.PropertyToID("_EmissionColor");
@@ -50,6 +50,7 @@ public class Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
             m_nview.GetZDO().Set(m_timerKey, (long)ZNet.instance.GetTimeSeconds());
         }
 
+        if (WaypointsPlugin._usesCharges.Value is WaypointsPlugin.Toggle.Off) return;
         if (GetCurrentCharge() > 0 && WaypointsPlugin._Decays.Value is WaypointsPlugin.Toggle.On)
         {
             InvokeRepeating(nameof(UpdateCharge), m_updateTime, m_updateTime);
@@ -162,7 +163,7 @@ public class Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
 
     private bool CanTeleport(Player player, bool message = true)
     {
-        if (GetCurrentCharge() - WaypointsPlugin._cost.Value < 0)
+        if (GetCurrentCharge() - WaypointsPlugin._cost.Value < 0 && WaypointsPlugin._usesCharges.Value is WaypointsPlugin.Toggle.On)
         {
             if (message) player.Message(MessageHud.MessageType.Center, "$msg_chargerequired");
             return false;
@@ -220,7 +221,7 @@ public class Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
         Game.m_noMap = false;
     }
 
-    private void ResetMapMode() => Game.m_noMap = m_noMapMode;
+    private static void ResetMapMode() => Game.m_noMap = m_noMapMode;
 
     private static Minimap.PinData? GetNearestPin(Vector3 position, float radius)
     {
@@ -265,7 +266,7 @@ public class Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
         }
     }
 
-    private static void CancelTeleportUI()
+    private static void CloseUI()
     {
         m_teleporting = false;
         foreach (Minimap.PinData? pin in m_tempPins)
@@ -273,12 +274,13 @@ public class Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
             Minimap.instance.RemovePin(pin);
         }
         m_tempPins.Clear();
+        ResetMapMode();
     }
 
     private static void CloseMap()
     {
         Minimap.instance.SetMapMode(Game.m_noMap ? Minimap.MapMode.None : Minimap.MapMode.Small);
-        CancelTeleportUI();
+        CloseUI();
     }
     
     private void AddPins(Player player)
@@ -372,11 +374,11 @@ public class Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
         m_teleporting = true;
         AddPins(player);
         Minimap.instance.ShowPointOnMap(transform.position);
-        ResetMapMode();
     }
 
     public bool UseItem(Humanoid user, ItemDrop.ItemData item)
     {
+        if (WaypointsPlugin._usesCharges.Value is WaypointsPlugin.Toggle.Off) return false;
         if (GetChargeItem()?.m_itemData.m_shared.m_name != item.m_shared.m_name) return false;
         if (!AddCharge(1))
         {
@@ -392,7 +394,8 @@ public class Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
     {
         StringBuilder stringBuilder = new StringBuilder();
         stringBuilder.Append(GetText() + "\n");
-        stringBuilder.AppendFormat("{0}: {1}/{2} \n", GetChargeItem()?.m_itemData.m_shared.m_name, GetCurrentCharge(), WaypointsPlugin._chargeMax.Value);
+        if (WaypointsPlugin._usesCharges.Value is WaypointsPlugin.Toggle.On) 
+            stringBuilder.AppendFormat("{0}: {1}/{2} \n", GetChargeItem()?.m_itemData.m_shared.m_name, GetCurrentCharge(), WaypointsPlugin._chargeMax.Value);
         stringBuilder.AppendFormat("[<color=yellow>{0}</color>] {1}\n", "$KEY_Use", "$piece_use");
         if (CanRename()) stringBuilder.AppendFormat("[<color=yellow>{0}</color>] {1}", "L.Shift + $KEY_Use", "$hud_rename");
         
@@ -468,7 +471,7 @@ public class Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
     {
         private static void Postfix(Minimap.MapMode mode)
         {
-            if (mode is not Minimap.MapMode.Large) CancelTeleportUI();
+            if (mode is not Minimap.MapMode.Large) CloseUI();
         }
     }
 }

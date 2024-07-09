@@ -12,15 +12,15 @@ namespace Waypoints.Managers;
 public static class WaypointManager
 {
     private static readonly List<ZDO> m_tempZDOs = new();
-    public static readonly List<string> m_prefabsToSearch = new();
+    private static readonly List<string> m_prefabsToSearch = new();
     public static bool m_teleportToUnplaced;
-
     public static void AddPrefabToSearch(string prefabName)
     {
         if (m_prefabsToSearch.Contains(prefabName)) return;
         m_prefabsToSearch.Add(prefabName);
     }
-    public static void InitCoroutine() => WaypointsPlugin._Plugin.StartCoroutine(SendWaypointDestinations());
+
+    private static void InitCoroutine() => WaypointsPlugin._Plugin.StartCoroutine(SendWaypointDestinations());
     private static IEnumerator SendWaypointDestinations()
     {
         WaypointsPlugin.WaypointsLogger.LogDebug("Initialized waypoint coroutine");
