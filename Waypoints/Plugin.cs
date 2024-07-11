@@ -20,7 +20,7 @@ namespace Waypoints
     public class WaypointsPlugin : BaseUnityPlugin
     {
         internal const string ModName = "Waypoints";
-        internal const string ModVersion = "1.0.0";
+        internal const string ModVersion = "1.0.1";
         internal const string Author = "RustyMods";
         private const string ModGUID = Author + "." + ModName;
         private static readonly string ConfigFileName = ModGUID + ".cfg";
@@ -28,7 +28,7 @@ namespace Waypoints
         internal static string ConnectionError = "";
         private readonly Harmony _harmony = new(ModGUID);
         public static readonly ManualLogSource WaypointsLogger = BepInEx.Logging.Logger.CreateLogSource(ModName);
-        private static readonly ConfigSync ConfigSync = new(ModGUID) { DisplayName = ModName, CurrentVersion = ModVersion, MinimumRequiredVersion = ModVersion };
+        public static readonly ConfigSync ConfigSync = new(ModGUID) { DisplayName = ModName, CurrentVersion = ModVersion, MinimumRequiredVersion = ModVersion };
         public enum Toggle { On = 1, Off = 0 }
 
         public static WaypointsPlugin _Plugin = null!;
@@ -47,6 +47,9 @@ namespace Waypoints
         public static ConfigEntry<Toggle> _UseKeys = null!;
         public static ConfigEntry<Toggle> _TeleportTames = null!;
         public static ConfigEntry<Toggle> _onlyAdminRenames = null!;
+        public static ConfigEntry<Toggle> _teleportToBed = null!;
+        public static ConfigEntry<Toggle> _teleportToLocations = null!;
+
         public static readonly Dictionary<string, ConfigEntry<string>> keyConfigs = new();
 
         public void LoadConfigs()
@@ -65,6 +68,10 @@ namespace Waypoints
             _UseKeys = config("2 - Settings", "Use Keys", Toggle.Off, "If on, portal checks if game has global key to allow teleportation of non-teleportable items");
             _TeleportTames = config("2 - Settings", "Teleport Tames", Toggle.Off, "If on, portal can teleport tames that are following player");
             _onlyAdminRenames = config("2 - Settings", "Only Admin Renames", Toggle.Off, "If on, only admins can rename waypoints");
+            _teleportToBed = config("2 - Settings", "Teleport To Bed", Toggle.On,
+                "If on, players can teleport to their beds");
+            _teleportToLocations = config("2 - Settings", "Teleport To Locations", Toggle.On,
+                "If on, players can teleport to locations");
         }
         
         private static AssetBundle GetAssetBundle(string fileName)
@@ -101,7 +108,7 @@ namespace Waypoints
                         m_quantity = 20,
                         m_group = "Waypoints",
                         m_prefabName = "WaypointLocation",
-                        m_prioritized = true,
+                        m_prioritized = false,
                         m_minDistanceFromSimilar = 1000f,
                         m_surroundCheckVegetation = true,
                         m_surroundCheckDistance = 10f,

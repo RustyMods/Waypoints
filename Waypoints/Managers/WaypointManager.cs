@@ -1,8 +1,11 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using BepInEx;
 using BepInEx.Configuration;
 using HarmonyLib;
+using ServerSync;
 using UnityEngine;
 using Waypoints.Behaviors;
 using YamlDotNet.Serialization;
@@ -14,6 +17,8 @@ public static class WaypointManager
     private static readonly List<ZDO> m_tempZDOs = new();
     private static readonly List<string> m_prefabsToSearch = new();
     public static bool m_teleportToUnplaced;
+
+    private static readonly CustomSyncedValue<List<string>> m_locationWaypoints = new CustomSyncedValue<List<string>>(WaypointsPlugin.ConfigSync, "CustomSyncedWaypointsData", new());
     public static void AddPrefabToSearch(string prefabName)
     {
         if (m_prefabsToSearch.Contains(prefabName)) return;
@@ -23,6 +28,7 @@ public static class WaypointManager
     private static void InitCoroutine() => WaypointsPlugin._Plugin.StartCoroutine(SendWaypointDestinations());
     private static IEnumerator SendWaypointDestinations()
     {
+        
         WaypointsPlugin.WaypointsLogger.LogDebug("Initialized waypoint coroutine");
         for (;;)
         {
@@ -45,6 +51,24 @@ public static class WaypointManager
             yield return new WaitForSeconds(10f);
         }
     }
+    
+    private static void UpdateServerLocationData()
+    {
+        if (!ZNet.instance || !ZNet.instance.IsServer()) return;
+        
+        List<ZoneSystem.LocationInstance> waypoints = ZoneSystem.instance.GetLocationList().Where(location => location.m_location.m_prefab.Name.ToLower().Contains("waypoint")).ToList();
+
+        var data = new List<string>();
+        int count = 0;
+        foreach (ZoneSystem.LocationInstance waypoint in waypoints)
+        {
+            data.Add(Waypoint.FormatPosition(waypoint.m_position));
+            ++count;
+        }
+
+        m_locationWaypoints.Value = data;
+        WaypointsPlugin.WaypointsLogger.LogDebug($"Registered {count} waypoint locations on the server");
+    }
 
     public static ZDO? GetDestination(Vector3 position) => FindDestinations().ToList().Find(x => Waypoint.MatchFound(x.m_position, position));
 
@@ -66,7 +90,12 @@ public static class WaypointManager
     [HarmonyPatch(typeof(ZNet), nameof(ZNet.Awake))]
     private static class ZNet_Awake_Patch
     {
-        private static void Postfix() => InitCoroutine();
+        private static void Postfix(ZNet __instance)
+        {
+            if (!__instance) return;
+            if (!__instance.IsServer()) return;
+            InitCoroutine();
+        }
     }
 
     [HarmonyPatch(typeof(Terminal), nameof(Terminal.Awake))]
@@ -120,19 +149,35 @@ public static class WaypointManager
         }
         
         RevealPlacedWaypoints();
-        
-        List<ZoneSystem.LocationInstance> waypoints = ZoneSystem.instance.GetLocationList().Where(location => location.m_location.m_prefab.Name.ToLower().Contains("waypoint")).ToList();
 
-        foreach (Minimap.PinData pin in args.Context.m_findPins) Minimap.instance.RemovePin(pin);
         int count = 0;
-        foreach (ZoneSystem.LocationInstance waypoint in waypoints)
+
+        if (ZNet.instance.IsServer())
         {
-            if (waypoint.m_placed) continue;
-            if (Waypoint.IsMatchFound(Waypoint.GetPlayerCustomData(Player.m_localPlayer), waypoint.m_position)) continue;
-            Waypoint.m_tempPins.Add(Minimap.instance.AddPin(waypoint.m_position, Minimap.PinType.Icon4, Waypoint.FormatPosition(waypoint.m_position), false, false));
-            ++count;
+            List<ZoneSystem.LocationInstance> waypoints = ZoneSystem.instance.GetLocationList().Where(location => location.m_location.m_prefab.Name.ToLower().Contains("waypoint")).ToList();
+
+            foreach (Minimap.PinData pin in args.Context.m_findPins) Minimap.instance.RemovePin(pin);
+            
+            foreach (ZoneSystem.LocationInstance waypoint in waypoints)
+            {
+                if (waypoint.m_placed) continue;
+                if (Waypoint.IsMatchFound(Waypoint.GetPlayerCustomData(Player.m_localPlayer), waypoint.m_position)) continue;
+                Waypoint.m_tempPins.Add(Minimap.instance.AddPin(waypoint.m_position, Minimap.PinType.Icon4, Waypoint.FormatPosition(waypoint.m_position), false, false));
+                ++count;
+            }
+            
         }
-        
+        else
+        {
+            if (m_locationWaypoints.Value.Count == 0) return;
+            foreach (var position in m_locationWaypoints.Value)
+            {
+                if (!Waypoint.GetVector(position, out Vector3 pos)) continue;
+                if (Waypoint.IsMatchFound(Waypoint.GetPlayerCustomData(Player.m_localPlayer), pos)) continue;
+                Waypoint.m_tempPins.Add(Minimap.instance.AddPin(pos, Minimap.PinType.Icon4, Waypoint.FormatPosition(pos), false, false));
+                ++count;
+            }
+        }
         WaypointsPlugin.WaypointsLogger.LogInfo($"Revealed {count} un-placed waypoints on map");
         m_teleportToUnplaced = true;
     }
@@ -140,7 +185,6 @@ public static class WaypointManager
     private static void RevealPlacedWaypoints()
     {
         int count = 0;
-
         List<Vector3> data = Waypoint.GetPlayerCustomData(Player.m_localPlayer);
         foreach (ZDO destination in FindDestinations())
         {
@@ -197,13 +241,17 @@ public static class WaypointManager
             if (!__instance) return;
             foreach (var prefab in __instance.m_prefabs)
             {
-                if (prefab.TryGetComponent(out ItemDrop component))
-                {
-                    if (component.m_itemData.m_shared.m_teleportable) continue;
-                    ConfigEntry<string> config = WaypointsPlugin._Plugin.config("Keys", prefab.name, "", "Set defeat key to allow teleportation");
-                    WaypointsPlugin.keyConfigs[component.m_itemData.m_shared.m_name] = config;
-                }
+                if (!prefab.TryGetComponent(out ItemDrop component)) continue;
+                if (component.m_itemData.m_shared.m_teleportable) continue;
+                ConfigEntry<string> config = WaypointsPlugin._Plugin.config("Keys", prefab.name, "", "Set defeat key to allow teleportation");
+                WaypointsPlugin.keyConfigs[component.m_itemData.m_shared.m_name] = config;
             }
         }
+    }
+
+    [HarmonyPatch(typeof(ZoneSystem), nameof(ZoneSystem.GenerateLocationsIfNeeded))]
+    private static class RegisterGeneratedWaypoints
+    {
+        private static void Postfix() => UpdateServerLocationData();
     }
 }

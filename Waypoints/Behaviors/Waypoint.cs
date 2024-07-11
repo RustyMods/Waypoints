@@ -242,6 +242,12 @@ public class Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
     {
         Minimap.PinData? destination = GetNearestPin(Minimap.instance.ScreenToWorldPoint(Input.mousePosition), m_pinRadius);
         if (destination == null) return;
+        if (destination.m_type is Minimap.PinType.Bed)
+        {
+            Teleport(destination.m_pos);
+            CloseMap();
+            return;
+        }
         ZDO? waypoint = WaypointManager.GetDestination(destination.m_pos);
         if (waypoint == null)
         {
@@ -285,6 +291,8 @@ public class Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
     
     private void AddPins(Player player)
     {
+        AddCustomSpawnPin();
+        AddLocationPins();
         List<Vector3> data = GetPlayerCustomData(player);
         if (data.Count == 0) return;
         HashSet<ZDO> destinations = WaypointManager.FindDestinations();
@@ -293,6 +301,36 @@ public class Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
             if (destination.m_uid == m_nview.GetZDO().m_uid) continue;
             if (!IsMatchFound(data, destination.m_position)) continue;
             m_tempPins.Add(Minimap.instance.AddPin(destination.m_position, Minimap.PinType.Icon4, destination.GetString(m_key), false, false));
+        }
+    }
+
+    private static void AddLocationPins()
+    {
+        if (WaypointsPlugin._teleportToLocations.Value is WaypointsPlugin.Toggle.Off) return;
+        if (!Minimap.instance) return;
+        foreach (KeyValuePair<Vector3, Minimap.PinData> pin in Minimap.instance.m_locationPins)
+        {
+            m_tempPins.Add(new Minimap.PinData()
+            {
+                m_pos = pin.Value.m_pos,
+                m_name = "UniqueLocation",
+                m_type = Minimap.PinType.Bed
+            });
+        }
+    }
+
+    private static void AddCustomSpawnPin()
+    {
+        if (WaypointsPlugin._teleportToBed.Value is WaypointsPlugin.Toggle.Off) return;
+        PlayerProfile? profile = Game.instance.GetPlayerProfile();
+        if (profile.HaveCustomSpawnPoint())
+        {
+            m_tempPins.Add(new Minimap.PinData()
+            {
+                m_pos = profile.GetCustomSpawnPoint(),
+                m_name = "SpawnPoint",
+                m_type = Minimap.PinType.Bed
+            });
         }
     }
     
@@ -327,15 +365,23 @@ public class Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
         List<Vector3> positions = new();
         foreach (string? input in list)
         {
-            string[] info = input.Split(',');
-            if (info.Length != 3) continue;
-            float x = float.Parse(info[0]);
-            float y = float.Parse(info[1]);
-            float z = float.Parse(info[2]);
-            positions.Add(new Vector3(x, y, z));
+            if (!GetVector(input, out Vector3 position)) continue;
+            positions.Add(position);
         }
 
         return positions;
+    }
+
+    public static bool GetVector(string input, out Vector3 output)
+    {
+        output = Vector3.zero;
+        string[] info = input.Split(',');
+        if (info.Length != 3) return false;
+        float x = float.Parse(info[0]);
+        float y = float.Parse(info[1]);
+        float z = float.Parse(info[2]);
+        output = new Vector3(x, y, z);
+        return true;
     }
 
     private bool CanRename()

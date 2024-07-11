@@ -15,25 +15,27 @@ public class LocationManager
         Harmony harmony = new Harmony("org.bepinex.helpers.RustyLocationManager");
         harmony.Patch(AccessTools.DeclaredMethod(typeof(ZoneSystem), nameof(ZoneSystem.SetupLocations)),
             prefix: new HarmonyMethod(AccessTools.DeclaredMethod(typeof(LocationManager), nameof(SetupLocations_Prefix))));
+        harmony.Patch(AccessTools.DeclaredMethod(typeof(Piece), nameof(Piece.Awake)),
+            postfix: new HarmonyMethod(AccessTools.DeclaredMethod(typeof(LocationManager), nameof(PieceAwakePatch))));
+    }
+
+    internal static void PieceAwakePatch(Piece __instance)
+    {
+        if (!__instance) return;
+        string name = __instance.name.Replace("(Clone)", string.Empty);
+        if (name != "WaypointShrine") return;
+        if (__instance.GetComponent<Waypoint>()) return;
+        __instance.gameObject.AddComponent<Waypoint>();
     }
     private static void SetupLocations_Prefix(ZoneSystem __instance)
     {
         if (WaypointsPlugin._generateLocations.Value is WaypointsPlugin.Toggle.Off) return;
         List<ZoneSystem.ZoneLocation> locations = new();
-        foreach (var location in m_locations.Values)
+        foreach (LocationData? location in m_locations.Values)
         {
             ZoneSystem.ZoneLocation data = location.GetLocation();
             if (data.m_prefab.IsValid)
             {
-                data.m_prefab.Load();
-                var shrine = data.m_prefab.Asset.transform.Find(location.m_waypoint);
-                if (shrine)
-                {
-                    GameObject gameObject = shrine.gameObject;
-                    if (!gameObject.GetComponent<Waypoint>()) gameObject.AddComponent<Waypoint>();
-                    MaterialReplacer.ProcessGameObjectShaders(gameObject, MaterialReplacer.ShaderType.PieceShader);
-                }
-                data.m_prefab.HoldReference();
                 locations.Add(data);
             }
             else
