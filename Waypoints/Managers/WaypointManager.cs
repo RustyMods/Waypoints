@@ -1,8 +1,6 @@
-﻿using System;
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using BepInEx;
 using BepInEx.Configuration;
 using HarmonyLib;
 using ServerSync;
@@ -18,7 +16,8 @@ public static class WaypointManager
     private static readonly List<string> m_prefabsToSearch = new();
     public static bool m_teleportToUnplaced;
 
-    private static readonly CustomSyncedValue<List<string>> m_locationWaypoints = new CustomSyncedValue<List<string>>(WaypointsPlugin.ConfigSync, "CustomSyncedWaypointsData", new());
+    private static readonly CustomSyncedValue<List<string>> m_locationWaypoints = 
+        new CustomSyncedValue<List<string>>(WaypointsPlugin.ConfigSync, "CustomSyncedWaypointsData", new());
     public static void AddPrefabToSearch(string prefabName)
     {
         if (m_prefabsToSearch.Contains(prefabName)) return;
@@ -28,7 +27,6 @@ public static class WaypointManager
     private static void InitCoroutine() => WaypointsPlugin._Plugin.StartCoroutine(SendWaypointDestinations());
     private static IEnumerator SendWaypointDestinations()
     {
-        
         WaypointsPlugin.WaypointsLogger.LogDebug("Initialized waypoint coroutine");
         for (;;)
         {
@@ -239,7 +237,7 @@ public static class WaypointManager
         private static void Postfix(ZNetScene __instance)
         {
             if (!__instance) return;
-            foreach (var prefab in __instance.m_prefabs)
+            foreach (GameObject prefab in __instance.m_prefabs)
             {
                 if (!prefab.TryGetComponent(out ItemDrop component)) continue;
                 if (component.m_itemData.m_shared.m_teleportable) continue;
@@ -254,4 +252,6 @@ public static class WaypointManager
     {
         private static void Postfix() => UpdateServerLocationData();
     }
+
+
 }
