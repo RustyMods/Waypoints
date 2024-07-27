@@ -425,9 +425,15 @@ public class Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
     private bool CanRename()
     {
         if (WaypointsPlugin._onlyAdminRenames.Value is WaypointsPlugin.Toggle.Off) return true;
-        string hostName = PrivilegeManager.GetNetworkUserId().Replace("Steam_", string.Empty);
-        if (!ZNet.instance.IsAdmin(hostName)) return false;
-        return true;
+        try
+        {
+            string hostName = PrivilegeManager.GetNetworkUserId().Replace("Steam_", string.Empty);
+            return ZNet.instance.IsAdmin(hostName);
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     public bool Interact(Humanoid user, bool hold, bool alt)
