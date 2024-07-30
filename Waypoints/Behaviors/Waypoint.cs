@@ -23,7 +23,8 @@ public class Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
     private static Waypoint? m_currentWaypoint;
     private static bool m_noMapMode;
     public static bool m_teleporting;
-    
+    public bool m_poi;
+
     private const float m_updateTime = 30f;
     private const float m_pinRadius = 35f;
     
@@ -70,7 +71,8 @@ public class Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
         }
         else
         {
-            SetEffects(IsMatchFound(GetPlayerCustomData(closestPlayer), GetPosition()) && CanTeleport(closestPlayer, false));
+            if (m_poi) SetEffects(true);
+            else SetEffects(IsMatchFound(GetPlayerCustomData(closestPlayer), GetPosition()) && CanTeleport(closestPlayer, false));
         }
     }
 
@@ -329,7 +331,7 @@ public class Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
         foreach (ZDO? destination in destinations)
         {
             if (destination.m_uid == m_nview.GetZDO().m_uid) continue;
-            if (!IsMatchFound(data, destination.m_position)) continue;
+            if (!IsMatchFound(data, destination.m_position) && destination.m_prefab != "WaypointShrinePortal".GetStableHashCode()) continue;
             string pinName = destination.GetString(m_key);
             bool flag = false;
             if (WaypointsPlugin._usesCharges.Value is WaypointsPlugin.Toggle.On)
