@@ -140,6 +140,7 @@
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </Content>
         <EmbeddedResource Include="translations\English.yml" />
+        <EmbeddedResource Include="translations\Portuguese_Brazilian.yml" />
         <Content Include="UpdateManifest.ps1" />
     </ItemGroup>
     <ItemGroup>

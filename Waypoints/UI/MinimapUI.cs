@@ -26,6 +26,12 @@ public static class MinimapUI
             if (clone.transform is RectTransform rectTransform)
             {
                 rectTransform.anchoredPosition = new Vector2(-375f, 41f);
+                var config = WaypointsPlugin._Plugin.config("2 - Settings", "8 - Map Toggle Position", rectTransform.position, "Modify position of map toggle");
+                rectTransform.position = config.Value;
+                config.SettingChanged += (sender, args) =>
+                {
+                    rectTransform.position = config.Value;
+                };
             }
             Toggle toggle = clone.GetComponentInChildren<Toggle>();
             toggle.onValueChanged.RemoveAllListeners();

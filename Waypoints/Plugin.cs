@@ -20,7 +20,7 @@ namespace Waypoints
     public class WaypointsPlugin : BaseUnityPlugin
     {
         internal const string ModName = "Waypoints";
-        internal const string ModVersion = "1.0.4";
+        internal const string ModVersion = "1.0.5";
         internal const string Author = "RustyMods";
         private const string ModGUID = Author + "." + ModName;
         private static readonly string ConfigFileName = ModGUID + ".cfg";
@@ -67,7 +67,7 @@ namespace Waypoints
             _teleportToBed = config("2 - Settings", "6 - Teleport To Bed", Toggle.On, "If on, players can teleport to their beds");
             _teleportToLocations = config("2 - Settings", "7 - Teleport To Locations", Toggle.On, "If on, players can teleport to locations");
             
-            _usesCharges = config("3 - Charge System", "0 - Enabled", Toggle.On, "If on, waypoints use charge system");
+            _usesCharges = config("3 - Charge System", "0 - Enabled", Toggle.Off, "If on, waypoints use charge system");
             _chargeItem = config("3 - Charge System", "1 - Charge Item", "GreydwarfEye", "Set charge item");
             _chargeMax = config("3 - Charge System", "2 - Charge Max", 50, "Set max charge");
             _Decays = config("3 - Charge System", "3 - Charge Decays", Toggle.On, "If on, portal charge decays over time");
@@ -181,7 +181,7 @@ namespace Waypoints
         }
 
 
-        private ConfigEntry<T> config<T>(string group, string name, T value, ConfigDescription description,
+        public ConfigEntry<T> config<T>(string group, string name, T value, ConfigDescription description,
             bool synchronizedSetting = true)
         {
             ConfigDescription extendedDescription =

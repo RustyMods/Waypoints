@@ -1,0 +1,7 @@
+msg_chargerequired: "Carga requerida"
+msg_fullycharged: "Totalmente carregado"
+hud_sharedwaypoints: "Mostrar pontos de parada"
+piece_waypoint: "Santuário de ponto de parada"
+piece_waypoint_desc: "Use o item de carga no ponto de parada para carregá-lo, é necessário tocá-lo para aprender sua localização"
+piece_waypointportal: "Portal de ponto de parada"
+piece_waypointportal_desc: "Ignora a necessidade de conhecer para usá-lo"
