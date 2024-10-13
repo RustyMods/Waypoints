@@ -11,8 +11,9 @@ using YamlDotNet.Serialization;
 
 namespace Waypoints.Behaviors;
 
-public class Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
+public class  Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
 {
+
     public static readonly int m_key = "WaypointShrine".GetStableHashCode();
     public static readonly string m_playerCustomDataKey = "WaypointShrineKeys";
     private static readonly int m_chargeKey = "WaypointCharge".GetStableHashCode();
@@ -21,7 +22,6 @@ public class Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
     private static readonly Vector3 m_exitDistance = new Vector3(1f, 1f, 1f);
     public static readonly List<Minimap.PinData> m_tempPins = new();
     private static Waypoint? m_currentWaypoint;
-    private static bool m_noMapMode;
     public static bool m_teleporting;
     public bool m_poi;
 
@@ -219,15 +219,7 @@ public class Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
             module.enabled = active;
         }
     }
-
-    private void SetMapMode()
-    {
-        m_noMapMode = Game.m_noMap;
-        Game.m_noMap = false;
-    }
-
-    private static void ResetMapMode() => Game.m_noMap = m_noMapMode;
-
+    
     private static Minimap.PinData? GetNearestPin(Vector3 position, float radius)
     {
         Minimap.PinData? result = null;
@@ -305,14 +297,12 @@ public class Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
         m_teleporting = false;
         foreach (Minimap.PinData? pin in m_tempPins) Minimap.instance.RemovePin(pin);
         m_tempPins.Clear();
-        ResetMapMode();
         m_currentWaypoint = null;
     }
 
     private static void CloseMap()
     {
-        Minimap.instance.SetMapMode(Game.m_noMap ? Minimap.MapMode.None : Minimap.MapMode.Small);
-        CloseUI();
+        Minimap.instance.SetMapMode(Minimap.MapMode.Small);
         MinimapUI.SetElement(true);
     }
     
@@ -394,32 +384,41 @@ public class Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
         Player.m_localPlayer.m_customData[m_playerCustomDataKey] = serializer.Serialize(info);
     }
 
-    public static string FormatPosition(Vector3 position) => $"{position.x},{position.y},{position.z}";
+    public bool IsKnown(Player player) => IsMatchFound(GetPlayerCustomData(player), GetPosition());
+
+    public static string FormatPosition(Vector3 position) => $"{position.x}{WaypointsPlugin.GetSeparator()}{position.y}{WaypointsPlugin.GetSeparator()}{position.z}";
 
     public static List<Vector3> GetPlayerCustomData(Player player)
     {
         if (!player.m_customData.TryGetValue(m_playerCustomDataKey, out string data)) return new();
         if (data.IsNullOrWhiteSpace()) return new();
-        IDeserializer deserializer = new DeserializerBuilder().Build();
-        List<string> list = deserializer.Deserialize<List<string>>(data);
-        List<Vector3> positions = new();
-        foreach (string? input in list)
+        try
         {
-            if (!GetVector(input, out Vector3 position)) continue;
-            positions.Add(position);
+            IDeserializer deserializer = new DeserializerBuilder().Build();
+            List<string> list = deserializer.Deserialize<List<string>>(data);
+            List<Vector3> positions = new();
+            foreach (string? input in list)
+            {
+                if (!GetVector(input, out Vector3 position)) continue;
+                positions.Add(position);
+            }
+            return positions;
+        }
+        catch
+        {
+            return new();
         }
 
-        return positions;
     }
 
     public static bool GetVector(string input, out Vector3 output)
     {
         output = Vector3.zero;
-        string[] info = input.Split(',');
+        string[] info = input.Split(WaypointsPlugin.GetSeparator());
         if (info.Length != 3) return false;
-        float x = float.Parse(info[0]);
-        float y = float.Parse(info[1]);
-        float z = float.Parse(info[2]);
+        if (!float.TryParse(info[0], out float x)) return false;
+        if (!float.TryParse(info[1], out float y)) return false;
+        if (!float.TryParse(info[2], out float z)) return false;
         output = new Vector3(x, y, z);
         return true;
     }
@@ -462,7 +461,7 @@ public class Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
     private void OpenMap(Humanoid user)
     {
         if (user is not Player player || !Minimap.instance) return;
-        SetMapMode();
+        Game.m_noMap = false;
         m_teleporting = true;
         AddPins(player);
         Minimap.instance.ShowPointOnMap(transform.position);
@@ -586,9 +585,13 @@ public class Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
     [HarmonyPatch(typeof(Minimap), nameof(Minimap.SetMapMode))]
     private static class Minimap_SetMapMode_Patch
     {
-        private static void Postfix(Minimap.MapMode mode)
+        private static void Prefix(Minimap.MapMode mode)
         {
-            if (mode is not Minimap.MapMode.Large) CloseUI();
+            if (mode is not Minimap.MapMode.Large)
+            {
+                Game.m_noMap = ZoneSystem.instance.GetGlobalKey(GlobalKeys.NoMap);
+                CloseUI();
+            }
         }
     }
 }

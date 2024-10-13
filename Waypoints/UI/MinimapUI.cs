@@ -21,12 +21,13 @@ public static class MinimapUI
     {
         private static void Postfix(Minimap __instance)
         {
+            if (!__instance) return;
             GameObject original = Utils.FindChild(__instance.transform, "SharedPanel").gameObject;
             GameObject clone = Object.Instantiate(original, original.transform.parent, false);
             if (clone.transform is RectTransform rectTransform)
             {
                 rectTransform.anchoredPosition = new Vector2(-375f, 41f);
-                var config = WaypointsPlugin._Plugin.config("2 - Settings", "8 - Map Toggle Position", rectTransform.position, "Modify position of map toggle");
+                var config = WaypointsPlugin._Plugin.config("2 - Settings", "8 - Map Toggle Position", rectTransform.position, "Modify position of map toggle", false);
                 rectTransform.position = config.Value;
                 config.SettingChanged += (sender, args) =>
                 {
@@ -52,11 +53,26 @@ public static class MinimapUI
         }
     }
 
-    [HarmonyPatch(typeof(Minimap), nameof(Minimap.Update))]
-    private static class Minimap_Update_Patch
+    [HarmonyPatch(typeof(Minimap), nameof(Minimap.OnDestroy))]
+    private static class Minimap_OnDestroy_Patch
     {
         private static void Postfix()
         {
+            Object.Destroy(m_element);
+        }
+    }
+
+    private static bool m_pinUpdateRequired = true;
+
+    [HarmonyPatch(typeof(Minimap), nameof(Minimap.Update))]
+    private static class Minimap_Update_Patch
+    {
+        private static void Postfix(Minimap __instance)
+        {
+            if (!__instance || !Player.m_localPlayer) return;
+            if (WorldGenerator.instance == null) return;
+            if (!__instance.m_hasGenerated) return;
+            if (!m_pinUpdateRequired) return;
             UpdatePins(m_show);
         }
     }
@@ -74,6 +90,7 @@ public static class MinimapUI
     {
         m_show = show;
         SaveToggle(show);
+        m_pinUpdateRequired = true;
     }
 
     private static void SaveToggle(bool toggle)
@@ -94,6 +111,8 @@ public static class MinimapUI
             if (show) AddPinsToMap();
             else ClearMapPins();
         }
+
+        m_pinUpdateRequired = false;
     }
     
     private static void AddPinsToMap()

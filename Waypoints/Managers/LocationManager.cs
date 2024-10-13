@@ -26,6 +26,7 @@ public class LocationManager
         if (name != "WaypointShrine") return;
         if (__instance.GetComponent<Waypoint>()) return;
         __instance.gameObject.AddComponent<Waypoint>();
+        __instance.gameObject.AddComponent<GlowTrails>();
     }
     private static void SetupLocations_Prefix(ZoneSystem __instance)
     {

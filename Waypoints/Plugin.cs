@@ -20,7 +20,7 @@ namespace Waypoints
     public class WaypointsPlugin : BaseUnityPlugin
     {
         internal const string ModName = "Waypoints";
-        internal const string ModVersion = "1.0.5";
+        internal const string ModVersion = "1.0.8";
         internal const string Author = "RustyMods";
         private const string ModGUID = Author + "." + ModName;
         private static readonly string ConfigFileName = ModGUID + ".cfg";
@@ -32,7 +32,7 @@ namespace Waypoints
         public enum Toggle { On = 1, Off = 0 }
 
         public static WaypointsPlugin _Plugin = null!;
-        private static readonly AssetBundle _assetBundle = GetAssetBundle("waypointbundle");
+        public static readonly AssetBundle _assetBundle = GetAssetBundle("waypointbundle");
         public static AssetLoaderManager m_assetLoaderManager = null!;
 
         private static ConfigEntry<Toggle> _serverConfigLocked = null!;
@@ -52,6 +52,9 @@ namespace Waypoints
         public static ConfigEntry<float> _distancePerCharge = null!;
         public static ConfigEntry<Toggle> _useDistanceCharge = null!;
         private static ConfigEntry<int> _locationAmount = null!;
+        private static ConfigEntry<string> _separator = null!;
+        public static ConfigEntry<Toggle> _showConnectionTrails = null!;
+        public static ConfigEntry<float> _connectionMaxRange = null!;
         public static readonly Dictionary<string, ConfigEntry<string>> keyConfigs = new();
 
         public void LoadConfigs()
@@ -75,8 +78,15 @@ namespace Waypoints
             _cost = config("3 - Charge System", "5 - Cost", 1, "Set base charge cost to teleport");
             _useDistanceCharge = config("3 - Charge System", "6 - Dynamic Cost", Toggle.Off, "If on, waypoints calculate distance of destination to evaluate cost");
             _distancePerCharge = config("3 - Charge System", "7 - Distance Units Per Charge", 100f, "Units of distance per charge, higher number reduces cost");
+            _separator = config("1 - General", "Vector Separator", ",", "Set the separator used to parse vectors");
+            _showConnectionTrails = config("4 - Trails", "_Enable", Toggle.On, "If on, trails appear when players get near unknown waypoint");
+            _connectionMaxRange = config("4 - Trails", "Max Range", 100f, "Set max range for trails to start appearing");
         }
-        
+
+        public static char GetSeparator()
+        {
+            return char.TryParse(_separator.Value, out char separator) ? separator : ',';
+        }
         private static AssetBundle GetAssetBundle(string fileName)
         {
             Assembly execAssembly = Assembly.GetExecutingAssembly();
@@ -93,6 +103,7 @@ namespace Waypoints
             Waypoint.Category.Set(BuildPieceCategory.Misc);
             Waypoint.RequiredItems.Add("SwordCheat", 1, false);
             Waypoint.Prefab.AddComponent<Waypoint>();
+            Waypoint.Prefab.AddComponent<GlowTrails>();
             WaypointManager.AddPrefabToSearch(Waypoint.Prefab.name);
             MaterialReplacer.RegisterGameObjectForShaderSwap(Waypoint.Prefab, MaterialReplacer.ShaderType.PieceShader);
             Waypoint.PlaceEffects = new() { "vfx_Place_workbench", "sfx_build_hammer_stone" };
@@ -110,6 +121,7 @@ namespace Waypoints
             WaypointPortal.Category.Set(BuildPieceCategory.Misc);
             WaypointPortal.RequiredItems.Add("SwordCheat", 1, false);
             Waypoint component = WaypointPortal.Prefab.AddComponent<Waypoint>();
+            WaypointPortal.Prefab.AddComponent<GlowTrails>();
             component.m_poi = true;
             WaypointManager.AddPrefabToSearch(WaypointPortal.Prefab.name);
             MaterialReplacer.RegisterGameObjectForShaderSwap(WaypointPortal.Prefab, MaterialReplacer.ShaderType.PieceShader);

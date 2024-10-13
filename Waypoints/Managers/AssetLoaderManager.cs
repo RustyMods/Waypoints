@@ -25,7 +25,7 @@ public class AssetLoaderManager
 
     private static void AssetBundleLoader_Postfix(AssetBundleLoader __instance)
     {
-        foreach (var kvp in m_assets)
+        foreach (KeyValuePair<AssetID, AssetRef> kvp in m_assets)
         {
             AddAssetToBundleLoader(__instance, kvp.Key, kvp.Value);
         }
