@@ -20,7 +20,7 @@ namespace Waypoints
     public class WaypointsPlugin : BaseUnityPlugin
     {
         internal const string ModName = "Waypoints";
-        internal const string ModVersion = "1.0.8";
+        internal const string ModVersion = "1.1.0";
         internal const string Author = "RustyMods";
         private const string ModGUID = Author + "." + ModName;
         private static readonly string ConfigFileName = ModGUID + ".cfg";
@@ -62,7 +62,7 @@ namespace Waypoints
             _serverConfigLocked = config("1 - General", "Lock Configuration", Toggle.On, "If on, the configuration is locked and can be changed by server admins only.");
             _ = ConfigSync.AddLockingConfigEntry(_serverConfigLocked);
             _generateLocations = config("2 - Settings", "0 - Locations", Toggle.On, "If on, waypoints will generate along side game locations");
-            _locationAmount = config("2 - Settings", "1 - Amount", 20, "Set amount of waypoint locations to attempt to generate");
+            _locationAmount = config("2 - Settings", "1 - Amount", 200, "Set amount of waypoint locations to attempt to generate");
             _onlyAdminRenames = config("2 - Settings", "2 - Only Admin Renames", Toggle.Off, "If on, only admins can rename waypoints");
             _TeleportAnything = config("2 - Settings", "3 - Teleport Anything", Toggle.Off, "If on, player can teleport non-teleportable items");
             _UseKeys = config("2 - Settings", "4 - Use Keys", Toggle.Off, "If on, portal checks if game has global key to allow teleportation of non-teleportable items");

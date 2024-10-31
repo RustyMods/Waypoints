@@ -9,18 +9,20 @@ public class GlowTrails : MonoBehaviour
         WaypointsPlugin._assetBundle.LoadAsset<GameObject>("vfx_waypoint_connection");
 
     private Waypoint m_waypoint = null!;
-    
+    private ZNetView m_nview = null!;
     private readonly Dictionary<Player, GameObject> m_connections = new();
     private Vector3 m_topPoint;
 
     public void Awake()
     {
+        m_nview = GetComponent<ZNetView>();
         m_waypoint = GetComponent<Waypoint>();
         m_topPoint = transform.Find("attach_point").position;
     }
 
     public void Update()
     {
+        if (!m_nview.IsValid()) return;
         if (WaypointsPlugin._showConnectionTrails.Value is WaypointsPlugin.Toggle.Off)
         {
             OnDestroy();

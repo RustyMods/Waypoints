@@ -109,6 +109,9 @@
         <Reference Include="UnityEngine.PhysicsModule">
           <HintPath>..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Data\Managed\UnityEngine.PhysicsModule.dll</HintPath>
         </Reference>
+        <Reference Include="UnityEngine.TextRenderingModule">
+          <HintPath>..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Data\Managed\UnityEngine.TextRenderingModule.dll</HintPath>
+        </Reference>
         <Reference Include="UnityEngine.UI">
             <HintPath>$(CorlibPath)\UnityEngine.UI.dll</HintPath>
         </Reference>
@@ -131,7 +134,7 @@
         <Compile Include="VersionHandshake.cs" />
     </ItemGroup>
     <ItemGroup>
-        <EmbeddedResource Include="..\..\..\4_11_2024_rip\ashland rip\AshlandRIP\AssetBundles\StandaloneWindows\waypointbundle">
+        <EmbeddedResource Include="..\..\..\VALHEIM RIPPED\ashland rip\AshlandRIP\AssetBundles\StandaloneWindows\waypointbundle">
           <Link>assets\waypointbundle</Link>
         </EmbeddedResource>
         <Content Include=".gitignore" />
