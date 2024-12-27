@@ -23,10 +23,7 @@ public static class WaypointManager
         m_prefabsToSearch.Add(prefabName);
     }
 
-    private static void InitCoroutine()
-    {
-        WaypointsPlugin._Plugin.StartCoroutine(SendWaypointDestinations());
-    }
+    private static void InitCoroutine() => WaypointsPlugin._Plugin.StartCoroutine(SendWaypointDestinations());
     private static IEnumerator SendWaypointDestinations()
     {
         WaypointsPlugin.WaypointsLogger.LogDebug("Initialized waypoint coroutine");
@@ -51,27 +48,15 @@ public static class WaypointManager
             yield return new WaitForSeconds(10f);
         }
     }
-    
-    private static void UpdateServerLocationData(ZoneSystem __instance)
+    public static void UpdateServerLocationData(ZoneSystem __instance)
     {
         if (!ZNet.instance || !ZNet.instance.IsServer()) return;
-        
         List<ZoneSystem.LocationInstance> waypoints = __instance.GetLocationList().Where(location => location.m_location.m_prefab.Name.ToLower().Contains("waypoint")).ToList();
-
-        var data = new List<string>();
-        int count = 0;
-        foreach (ZoneSystem.LocationInstance waypoint in waypoints)
-        {
-            data.Add(Waypoint.FormatPosition(waypoint.m_position));
-            ++count;
-        }
-
+        List<string> data = waypoints.Select(waypoint => Waypoint.FormatPosition(waypoint.m_position)).ToList();
         m_locationWaypoints.Value = data;
-        WaypointsPlugin.WaypointsLogger.LogDebug($"Registered {count} waypoint locations on the server");
+        WaypointsPlugin.WaypointsLogger.LogDebug($"Registered {data.Count} waypoint locations on the server");
     }
-
     public static ZDO? GetDestination(Vector3 position) => FindDestinations().ToList().Find(x => Waypoint.MatchFound(x.m_position, position));
-
     public static HashSet<ZDO> FindDestinations()
     {
         if (ZDOMan.instance == null) return new();
@@ -92,8 +77,7 @@ public static class WaypointManager
     {
         private static void Postfix(ZNet __instance)
         {
-            if (!__instance) return;
-            if (!__instance.IsServer()) return;
+            if (!__instance || !__instance.IsServer()) return;
             InitCoroutine();
         }
     }
@@ -122,9 +106,23 @@ public static class WaypointManager
                             case "reveal":
                                 RevealAllWaypoints(args);
                                 break;
+                            case "generate":
+                                LocationManager.Generate(int.TryParse(args[2], out int quantity) ? quantity : 10);
+                                break;
+                            case "remove":
+                                if (args[2] == "all")
+                                {
+                                    LocationManager.Remove(1, true);
+                                }
+                                else
+                                {
+                                    var amount = int.TryParse(args[2], out int count) ? count : 0;
+                                    LocationManager.Remove(amount);
+                                }
+                                break;
                         }
                         return true;
-                    }), optionsFetcher: () => new(){"help", "list", "reset", "reveal"});
+                    }), optionsFetcher: () => new(){"help", "list", "reset", "reveal", "generate", "remove"});
         }
     }
 
@@ -135,9 +133,10 @@ public static class WaypointManager
                     "list : list all known waypoints",
                     "reset : clears player save file of known waypoints",
                     "reveal : reveals all waypoints - admin only",
+                    "generate [count] : Attempts to generate new locations",
+                    "remove [count] : Attempts to remove waypoint locations, count can be [all]"
                 }) WaypointsPlugin.WaypointsLogger.LogInfo(info);
     }
-
     private static void RevealAllWaypoints(Terminal.ConsoleEventArgs args)
     {
         if (!Player.m_localPlayer || !Minimap.instance || !ZNet.instance || !ZoneSystem.instance) return;
@@ -165,7 +164,6 @@ public static class WaypointManager
                 Waypoint.m_tempPins.Add(Minimap.instance.AddPin(waypoint.m_position, Minimap.PinType.Icon4, Waypoint.FormatPosition(waypoint.m_position), false, false));
                 ++count;
             }
-            
         }
         else
         {
@@ -181,7 +179,6 @@ public static class WaypointManager
         WaypointsPlugin.WaypointsLogger.LogInfo($"Revealed {count} un-placed waypoints on map");
         m_teleportToUnplaced = true;
     }
-
     private static void RevealPlacedWaypoints()
     {
         if (!Player.m_localPlayer) return;
@@ -203,7 +200,6 @@ public static class WaypointManager
         }
         WaypointsPlugin.WaypointsLogger.LogInfo("No new waypoints added");
     }
-    
     private static void ResetKnownWaypoints()
     {
         if (!Player.m_localPlayer) return;
@@ -218,7 +214,6 @@ public static class WaypointManager
         
         WaypointsPlugin.WaypointsLogger.LogInfo("Cleared saved waypoints");
     }
-
     private static void ListKnownWaypoints()
     {
         if (!Player.m_localPlayer) return;
@@ -241,8 +236,7 @@ public static class WaypointManager
     {
         private static void Postfix(ZNetScene __instance)
         {
-            if (!__instance) return;
-            if (m_loadedConfigs) return;
+            if (!__instance || m_loadedConfigs) return;
             foreach (GameObject prefab in __instance.m_prefabs)
             {
                 if (!prefab.TryGetComponent(out ItemDrop component)) continue;

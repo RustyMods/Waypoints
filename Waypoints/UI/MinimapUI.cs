@@ -29,10 +29,7 @@ public static class MinimapUI
                 rectTransform.anchoredPosition = new Vector2(-375f, 41f);
                 var config = WaypointsPlugin._Plugin.config("2 - Settings", "8 - Map Toggle Position", rectTransform.position, "Modify position of map toggle", false);
                 rectTransform.position = config.Value;
-                config.SettingChanged += (sender, args) =>
-                {
-                    rectTransform.position = config.Value;
-                };
+                config.SettingChanged += (_, _) => rectTransform.position = config.Value;
             }
             Toggle toggle = clone.GetComponentInChildren<Toggle>();
             toggle.onValueChanged.RemoveAllListeners();
@@ -56,10 +53,7 @@ public static class MinimapUI
     [HarmonyPatch(typeof(Minimap), nameof(Minimap.OnDestroy))]
     private static class Minimap_OnDestroy_Patch
     {
-        private static void Postfix()
-        {
-            Object.Destroy(m_element);
-        }
+        private static void Postfix() => Object.Destroy(m_element);
     }
 
     private static bool m_pinUpdateRequired = true;

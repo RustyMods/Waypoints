@@ -20,7 +20,7 @@ namespace Waypoints
     public class WaypointsPlugin : BaseUnityPlugin
     {
         internal const string ModName = "Waypoints";
-        internal const string ModVersion = "1.1.0";
+        internal const string ModVersion = "1.1.1";
         internal const string Author = "RustyMods";
         private const string ModGUID = Author + "." + ModName;
         private static readonly string ConfigFileName = ModGUID + ".cfg";
@@ -51,7 +51,7 @@ namespace Waypoints
         public static ConfigEntry<Toggle> _teleportToLocations = null!;
         public static ConfigEntry<float> _distancePerCharge = null!;
         public static ConfigEntry<Toggle> _useDistanceCharge = null!;
-        private static ConfigEntry<int> _locationAmount = null!;
+        public static ConfigEntry<int> _locationAmount = null!;
         private static ConfigEntry<string> _separator = null!;
         public static ConfigEntry<Toggle> _showConnectionTrails = null!;
         public static ConfigEntry<float> _connectionMaxRange = null!;
@@ -130,24 +130,6 @@ namespace Waypoints
             WaypointPortal.HitEffects = new() { "vfx_RockHit" };
             WaypointPortal.SwitchEffects = new() { "vfx_Place_throne02" };
         }
-
-        private void LoadLocations()
-        {
-            LocationManager.LocationData WaypointLocation = new LocationManager.LocationData("WaypointLocation", _assetBundle, "WaypointShrine")
-                {
-                    m_data =
-                    {
-                        m_biome = Heightmap.Biome.All,
-                        m_quantity = _locationAmount.Value,
-                        m_group = "Waypoints",
-                        m_prefabName = "WaypointLocation",
-                        m_prioritized = false,
-                        m_minDistanceFromSimilar = 1000f,
-                        m_surroundCheckVegetation = true,
-                        m_surroundCheckDistance = 10f,
-                    }
-                };
-        }
         public void Awake()
         {
             _Plugin = this;
@@ -155,10 +137,27 @@ namespace Waypoints
             m_assetLoaderManager = new AssetLoaderManager(_Plugin.Info.Metadata);
             LoadConfigs();
             LoadPieces();
-            LoadLocations();
+            LocationManager.SetupWayShrineLocation();
             Assembly assembly = Assembly.GetExecutingAssembly();
             _harmony.PatchAll(assembly);
             SetupWatcher();
+        }
+
+        public void DelayedGenerateNotice()
+        {
+            LocationManager.GenerateSync.Value = $"Generated:{LocationManager.GeneratedCount}";
+            Invoke(nameof(DelayedLocationCountUpdate), 1f);
+        }
+
+        public void DelayedRemovedNotice()
+        {
+            LocationManager.GenerateSync.Value = $"Removed:{LocationManager.RemovedCount}";
+            Invoke(nameof(DelayedLocationCountUpdate), 1f);
+        }
+
+        public void DelayedLocationCountUpdate()
+        {
+            WaypointManager.UpdateServerLocationData(ZoneSystem.instance);
         }
 
         private void OnDestroy()

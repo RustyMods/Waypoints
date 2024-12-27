@@ -1,6 +1,8 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 using BepInEx;
 using HarmonyLib;
+using ServerSync;
 using SoftReferenceableAssets;
 using UnityEngine;
 using Waypoints.Behaviors;
@@ -9,62 +11,204 @@ namespace Waypoints.Managers;
 
 public class LocationManager
 {
-    private static readonly Dictionary<string, LocationData> m_locations = new();
+    public static readonly CustomSyncedValue<string> GenerateSync = new(WaypointsPlugin.ConfigSync, "WaypointGenerateCommand", "");
+    public static int GeneratedCount = 0;
+    public static int RemovedCount = 0;
+    private static LocationData WaypointLocation = null!;
     static LocationManager()
     {
         Harmony harmony = new Harmony("org.bepinex.helpers.RustyLocationManager");
-        harmony.Patch(AccessTools.DeclaredMethod(typeof(ZoneSystem), nameof(ZoneSystem.SetupLocations)),
-            prefix: new HarmonyMethod(AccessTools.DeclaredMethod(typeof(LocationManager), nameof(SetupLocations_Prefix))));
-        harmony.Patch(AccessTools.DeclaredMethod(typeof(Piece), nameof(Piece.Awake)),
-            postfix: new HarmonyMethod(AccessTools.DeclaredMethod(typeof(LocationManager), nameof(PieceAwakePatch))));
+        harmony.Patch(AccessTools.DeclaredMethod(typeof(ZoneSystem), nameof(ZoneSystem.SetupLocations)), prefix: new HarmonyMethod(AccessTools.DeclaredMethod(typeof(LocationManager), nameof(SetupLocations_Prefix))));
+        harmony.Patch(AccessTools.DeclaredMethod(typeof(Piece), nameof(Piece.Awake)), postfix: new HarmonyMethod(AccessTools.DeclaredMethod(typeof(LocationManager), nameof(PieceAwakePatch))));
     }
 
     internal static void PieceAwakePatch(Piece __instance)
     {
-        if (!__instance) return;
-        string name = __instance.name.Replace("(Clone)", string.Empty);
-        if (name != "WaypointShrine") return;
-        if (__instance.GetComponent<Waypoint>()) return;
+        if (!__instance || __instance.name.Replace("(Clone)", string.Empty) != "WaypointShrine" || __instance.GetComponent<Waypoint>()) return;
         __instance.gameObject.AddComponent<Waypoint>();
         __instance.gameObject.AddComponent<GlowTrails>();
     }
     private static void SetupLocations_Prefix(ZoneSystem __instance)
     {
         if (WaypointsPlugin._generateLocations.Value is WaypointsPlugin.Toggle.Off) return;
-        List<ZoneSystem.ZoneLocation> locations = new();
-        foreach (LocationData? location in m_locations.Values)
+        var data = WaypointLocation.GetLocation();
+        if (data.m_prefab.IsValid) __instance.m_locations.Add(data);
+    }
+    public static int Generate(int quantity)
+    {
+        if (!ZNet.instance || !ZoneSystem.instance) return 0;
+        if (Player.m_localPlayer && !Player.m_localPlayer.NoCostCheat())
         {
-            ZoneSystem.ZoneLocation data = location.GetLocation();
-            if (data.m_prefab.IsValid)
+            WaypointsPlugin.WaypointsLogger.LogInfo("Admin only, activate no cost mode");
+            return 0;
+        }
+        if (!ZNet.instance.IsServer())
+        {
+            WaypointsPlugin.WaypointsLogger.LogInfo("Host Only, sending message to server to generate");
+            GenerateSync.Value = "Generate:" + quantity;
+            return 0;
+        }
+        int count = 0;
+        ZoneSystem.ZoneLocation location = WaypointLocation.GetLocation();
+        for (int index = 0; index < quantity; ++index)
+        {
+            Vector2i zoneID = ZoneSystem.GetRandomZone(location.m_maxDistance);
+            if (ZoneSystem.instance.m_locationInstances.ContainsKey(zoneID)) continue;
+            Vector3 zonePos = ZoneSystem.GetZonePos(zoneID);
+            if (!location.m_biome.HasFlag(WorldGenerator.instance.GetBiome(zonePos))) continue;
+            if (!location.m_biomeArea.HasFlag(WorldGenerator.instance.GetBiomeArea(zonePos))) continue;
+            var randomPointInZone = ZoneSystem.GetRandomPointInZone(zoneID, Mathf.Max(location.m_exteriorRadius, location.m_interiorRadius));
+            randomPointInZone.y = WorldGenerator.instance.GetHeight(randomPointInZone.x, randomPointInZone.z, out Color mask1);
+            float num1 = randomPointInZone.y - 30f;
+            if (num1 < location.m_minAltitude || num1 > location.m_maxAltitude) continue;
+            if (location.m_inForest)
             {
-                locations.Add(data);
+                float forestFactor = WorldGenerator.GetForestFactor(randomPointInZone);
+                if (forestFactor < location.m_forestTresholdMin ||
+                    forestFactor > location.m_forestTresholdMax) continue;
+            }
+            WorldGenerator.instance.GetTerrainDelta(randomPointInZone, location.m_exteriorRadius, out float delta, out Vector3 _);
+            if (delta > location.m_maxTerrainDelta || delta < location.m_minTerrainDelta) continue;
+            if (location.m_minDistanceFromSimilar > 0.0 &&
+                ZoneSystem.instance.HaveLocationInRange(location.m_prefab.Name, location.m_group, randomPointInZone,
+                    location.m_minDistance)) continue;
+            if (location.m_maxDistanceFromSimilar > 0.0 && !ZoneSystem.instance.HaveLocationInRange(
+                    location.m_prefabName, location.m_groupMax, randomPointInZone,
+                    location.m_maxDistanceFromSimilar)) continue;
+            float a = mask1.a;
+            if (location.m_minimumVegetation > 0.0 && a <= location.m_minimumVegetation) continue;
+            if (location.m_maximumVegetation < 1.0 && a >= location.m_maximumVegetation) continue;
+            
+            ZoneSystem.instance.RegisterLocation(location, randomPointInZone, false);
+            Debug.Log("Added waypoint shrine location at: " + $"{randomPointInZone.x} , {randomPointInZone.z}");
+            ++count;
+        }
+        WaypointsPlugin.WaypointsLogger.LogInfo($"Generated {count} new locations");
+        return count;
+    }
+
+    public static int Remove(int quantity, bool all = false)
+    {
+        if (!ZNet.instance || !ZoneSystem.instance) return 0;
+        if (Player.m_localPlayer && !Player.m_localPlayer.NoCostCheat())
+        {
+            WaypointsPlugin.WaypointsLogger.LogInfo("Admin only, activate no cost mode");
+            return 0;
+        }
+
+        if (!ZNet.instance.IsServer())
+        {
+            WaypointsPlugin.WaypointsLogger.LogInfo("Host Only, sending message to server to remove");
+            GenerateSync.Value = $"Remove:{quantity}:{all}";
+            return 0;
+        }
+
+        var locations = ZoneSystem.instance.GetLocationList()
+            .Where(location => location.m_location.m_prefab.Name.ToLower().Contains("waypoint")).ToList();
+        List<Vector2i> KeysToRemove = new();
+        if (all)
+        {
+            foreach (var kvp in ZoneSystem.instance.m_locationInstances)
+            {
+                if (locations.Contains(kvp.Value))
+                {
+                    KeysToRemove.Add(kvp.Key);
+                }
+            }
+        }
+        else
+        {
+            int count = 0;
+            List<KeyValuePair<Vector2i, ZoneSystem.LocationInstance>> locationInstances =
+                ZoneSystem.instance.m_locationInstances.ToList();
+            while (count < quantity)
+            {
+                try
+                {
+                    var kvp = locationInstances[count];
+                    if (kvp.Value.m_placed) continue;
+                    if (!kvp.Value.m_location.m_prefab.Name.ToLower().Contains("waypoint")) continue;
+                    KeysToRemove.Add(kvp.Key);
+                    ++count;
+                }
+                catch
+                {
+                    break;
+                }
+            }
+        }
+        foreach (var key in KeysToRemove)
+        {
+            ZoneSystem.instance.m_locationInstances.Remove(key);
+        }
+        WaypointsPlugin.WaypointsLogger.LogInfo($"Removed {KeysToRemove.Count} waypoint shrine locations");
+        return KeysToRemove.Count;
+    }
+    
+    public static void SetupWayShrineLocation()
+    {
+        WaypointLocation = new("WaypointLocation", WaypointsPlugin._assetBundle, "WaypointShrine");
+        WaypointLocation.m_data.m_biome = Heightmap.Biome.All;
+        WaypointLocation.m_data.m_quantity = WaypointsPlugin._locationAmount.Value;
+        WaypointLocation.m_data.m_group = "Waypoints";
+        WaypointLocation.m_data.m_prefabName = "WaypointLocation";
+        WaypointLocation.m_data.m_prioritized = false;
+        WaypointLocation.m_data.m_minDistanceFromSimilar = 1000f;
+        WaypointLocation.m_data.m_surroundCheckVegetation = true;
+        WaypointLocation.m_data.m_surroundCheckDistance = 10f;
+        
+        GenerateSync.ValueChanged += () =>
+        {
+            if (!ZNet.instance || !ZoneSystem.instance) return;
+            if (GenerateSync.Value.IsNullOrWhiteSpace()) return;
+            var parts = GenerateSync.Value.Split(':');
+            var quantity = int.TryParse(parts[1], out int amount) ? amount : 0;
+            if (ZNet.instance.IsServer())
+            {
+                if (quantity <= 0) return;
+                switch (parts[0])
+                {
+                    case "Generate":
+                        GeneratedCount = Generate(quantity);
+                        WaypointsPlugin._Plugin.Invoke(nameof(WaypointsPlugin.DelayedGenerateNotice), 1f);
+                        break;
+                    case "Remove":
+                        RemovedCount = Remove(quantity);
+                        WaypointsPlugin._Plugin.Invoke(nameof(WaypointsPlugin.DelayedRemovedNotice), 1f);
+                        break;
+                    default: return;
+                }
             }
             else
             {
-                WaypointsPlugin.WaypointsLogger.LogDebug(data.m_prefabName + " is not valid");
+                switch (parts[0])
+                {
+                    case "Generated":
+                        WaypointsPlugin.WaypointsLogger.LogInfo($"Server generated {quantity} new waypoint shrines");
+                        break;
+                    case "Removed":
+                        WaypointsPlugin.WaypointsLogger.LogInfo($"Server removed {quantity} waypoint shrines");
+                        break;
+                    default: return;
+                }
             }
-        }
-        __instance.m_locations.AddRange(locations);
-        ZLog.Log($"Added {locations.Count} locations from Waypoints");
+        };
     }
 
     public class LocationData
     {
         private readonly AssetID AssetID;
-        public readonly GameObject prefab;
-        public string m_waypoint;
         public LocationData(string name, AssetBundle bundle, string waypoint = "")
         {
-            prefab = bundle.LoadAsset<GameObject>(name);
-            m_waypoint = waypoint;
-            if (!m_waypoint.IsNullOrWhiteSpace())
+            if (bundle.LoadAsset<GameObject>(name) is not { } prefab)
             {
-                WaypointManager.AddPrefabToSearch(m_waypoint);
+                Debug.LogWarning(name + " is null");
+                return;
             }
+            if (!waypoint.IsNullOrWhiteSpace()) WaypointManager.AddPrefabToSearch(waypoint);
             WaypointsPlugin.m_assetLoaderManager.AddAsset(prefab, out AssetID assetID);
             AssetID = assetID;
             m_data.m_prefabName = prefab.name;
-            m_locations[prefab.name] = this;
             
             WaypointsPlugin.WaypointsLogger.LogDebug("Registered location: " + name);
         }

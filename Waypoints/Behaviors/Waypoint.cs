@@ -64,8 +64,7 @@ public class  Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
     public void Update()
     {
         if (!Player.m_localPlayer || !m_nview.IsValid()) return;
-        Player closestPlayer = Player.GetClosestPlayer(transform.position, 5f);
-        if (closestPlayer == null)
+        if (Player.GetClosestPlayer(transform.position, 5f) is not {} closestPlayer)
         {
             SetEffects(false);
         }
@@ -461,6 +460,7 @@ public class  Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
     private void OpenMap(Humanoid user)
     {
         if (user is not Player player || !Minimap.instance) return;
+        HideExploredMap();
         Game.m_noMap = false;
         m_teleporting = true;
         AddPins(player);
@@ -468,7 +468,7 @@ public class  Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
         m_currentWaypoint = this;
         MinimapUI.SetElement(false);
     }
-    
+
     public bool UseItem(Humanoid user, ItemDrop.ItemData item)
     {
         if (WaypointsPlugin._usesCharges.Value is WaypointsPlugin.Toggle.Off) return false;
@@ -590,8 +590,29 @@ public class  Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
             if (mode is not Minimap.MapMode.Large)
             {
                 Game.m_noMap = ZoneSystem.instance.GetGlobalKey(GlobalKeys.NoMap);
+                ResetHideExplore();
                 CloseUI();
             }
         }
+    }
+
+    private static bool[]? explored;
+    private static bool[]? otherExplored;
+    private static bool ExploreHidden;
+    private static void HideExploredMap()
+    {
+        if (!Game.m_noMap) return;
+        explored = Minimap.instance.m_explored;
+        otherExplored = Minimap.instance.m_exploredOthers;
+        ExploreHidden = true;
+        Minimap.instance.Reset();
+    }
+
+    private static void ResetHideExplore()
+    {
+        if (!ExploreHidden) return;
+        Minimap.instance.m_explored = explored;
+        Minimap.instance.m_exploredOthers = otherExplored;
+        ExploreHidden = false;
     }
 }

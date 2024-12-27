@@ -5,8 +5,7 @@ namespace Waypoints.Behaviors;
 
 public class GlowTrails : MonoBehaviour
 {
-    private static readonly GameObject m_connectionPrefab =
-        WaypointsPlugin._assetBundle.LoadAsset<GameObject>("vfx_waypoint_connection");
+    private static readonly GameObject m_connectionPrefab = WaypointsPlugin._assetBundle.LoadAsset<GameObject>("vfx_waypoint_connection");
 
     private Waypoint m_waypoint = null!;
     private ZNetView m_nview = null!;
