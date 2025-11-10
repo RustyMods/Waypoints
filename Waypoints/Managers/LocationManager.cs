@@ -108,7 +108,7 @@ public class LocationManager
         List<Vector2i> KeysToRemove = new();
         if (all)
         {
-            foreach (var kvp in ZoneSystem.instance.m_locationInstances)
+            foreach (KeyValuePair<Vector2i, ZoneSystem.LocationInstance> kvp in ZoneSystem.instance.m_locationInstances)
             {
                 if (locations.Contains(kvp.Value))
                 {

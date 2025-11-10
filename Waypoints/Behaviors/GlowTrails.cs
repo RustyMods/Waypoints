@@ -1,12 +1,22 @@
 ﻿using System.Collections.Generic;
+using HarmonyLib;
 using UnityEngine;
 
 namespace Waypoints.Behaviors;
 
 public class GlowTrails : MonoBehaviour
 {
-    private static readonly GameObject m_connectionPrefab = WaypointsPlugin._assetBundle.LoadAsset<GameObject>("vfx_waypoint_connection");
+    [HarmonyPatch(typeof(ZNetScene), nameof(ZNetScene.Awake))]
+    private static class ZNetScene_Awake_Patch
+    {
+        private static void Postfix()
+        {
+            m_connectionPrefab = ZNetScene.instance.GetPrefab("piece_workbench_ext1").GetComponent<StationExtension>().m_connectionPrefab;
+        }
+    }
 
+    private static GameObject? m_connectionPrefab;
+    
     private Waypoint m_waypoint = null!;
     private ZNetView m_nview = null!;
     private readonly Dictionary<Player, GameObject> m_connections = new();
@@ -16,7 +26,7 @@ public class GlowTrails : MonoBehaviour
     {
         m_nview = GetComponent<ZNetView>();
         m_waypoint = GetComponent<Waypoint>();
-        m_topPoint = transform.Find("attach_point").position;
+        m_topPoint = transform.Find("demister").position;
     }
 
     public void Update()
@@ -57,6 +67,7 @@ public class GlowTrails : MonoBehaviour
     
     private void UpdateConnection(Player player)
     {
+        if (m_connectionPrefab is null) return;
         if (!m_connections.TryGetValue(player, out GameObject connection))
         {
             connection = Instantiate(m_connectionPrefab, player.GetCenterPoint(), Quaternion.identity);

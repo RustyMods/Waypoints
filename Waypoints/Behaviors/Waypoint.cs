@@ -4,6 +4,7 @@ using System.Text;
 using BepInEx;
 using BepInEx.Configuration;
 using HarmonyLib;
+using JetBrains.Annotations;
 using UnityEngine;
 using Waypoints.Managers;
 using Waypoints.UI;
@@ -13,7 +14,6 @@ namespace Waypoints.Behaviors;
 
 public class  Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
 {
-
     public static readonly int m_key = "WaypointShrine".GetStableHashCode();
     public static readonly string m_playerCustomDataKey = "WaypointShrineKeys";
     private static readonly int m_chargeKey = "WaypointCharge".GetStableHashCode();
@@ -34,6 +34,9 @@ public class  Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
     private Light m_light = null!;
     private bool m_particlesActive = true;
     private float m_intensity;
+    
+    public static bool noMap = Game.m_noMap;
+
 
     public void Awake()
     {
@@ -385,7 +388,7 @@ public class  Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
 
     public bool IsKnown(Player player) => IsMatchFound(GetPlayerCustomData(player), GetPosition());
 
-    public static string FormatPosition(Vector3 position) => $"{position.x}{WaypointsPlugin.GetSeparator()}{position.y}{WaypointsPlugin.GetSeparator()}{position.z}";
+    public static string FormatPosition(Vector3 position) => $"{position.x}#{position.y}#{position.z}";
 
     public static List<Vector3> GetPlayerCustomData(Player player)
     {
@@ -413,7 +416,7 @@ public class  Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
     public static bool GetVector(string input, out Vector3 output)
     {
         output = Vector3.zero;
-        string[] info = input.Split(WaypointsPlugin.GetSeparator());
+        string[] info = input.Split('#');
         if (info.Length != 3) return false;
         if (!float.TryParse(info[0], out float x)) return false;
         if (!float.TryParse(info[1], out float y)) return false;
@@ -425,15 +428,7 @@ public class  Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
     private bool CanRename()
     {
         if (WaypointsPlugin._onlyAdminRenames.Value is WaypointsPlugin.Toggle.Off) return true;
-        try
-        {
-            string hostName = PrivilegeManager.GetNetworkUserId().Replace("Steam_", string.Empty);
-            return ZNet.instance.IsAdmin(hostName);
-        }
-        catch
-        {
-            return false;
-        }
+        return ZNet.m_instance.LocalPlayerIsAdminOrHost();
     }
 
     public bool Interact(Humanoid user, bool hold, bool alt)
@@ -456,11 +451,11 @@ public class  Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
         }
         return true;
     }
-
     private void OpenMap(Humanoid user)
     {
         if (user is not Player player || !Minimap.instance) return;
         HideExploredMap();
+        noMap = Game.m_noMap;
         Game.m_noMap = false;
         m_teleporting = true;
         AddPins(player);
@@ -568,7 +563,7 @@ public class  Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
         pos.y = ZoneSystem.instance.GetSolidHeight(pos) + 0.5f;
         transform1.position = pos;
         transform1.rotation = rot;
-        character.m_body.velocity = Vector3.zero;
+        character.m_body.linearVelocity = Vector3.zero;
     }
     
     [HarmonyPatch(typeof(Minimap), nameof(Minimap.OnMapLeftClick))]
@@ -585,11 +580,13 @@ public class  Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
     [HarmonyPatch(typeof(Minimap), nameof(Minimap.SetMapMode))]
     private static class Minimap_SetMapMode_Patch
     {
+        [UsedImplicitly]
         private static void Prefix(Minimap.MapMode mode)
         {
+            
             if (mode is not Minimap.MapMode.Large)
             {
-                Game.m_noMap = ZoneSystem.instance.GetGlobalKey(GlobalKeys.NoMap);
+                Game.m_noMap = ZoneSystem.instance && ZoneSystem.instance.GetGlobalKey(GlobalKeys.NoMap) || Player.m_localPlayer != null && PlayerPrefs.GetFloat("mapenabled_" + Player.m_localPlayer.GetPlayerName(), 1f) == 0.0;
                 ResetHideExplore();
                 CloseUI();
             }
@@ -601,6 +598,7 @@ public class  Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
     private static bool ExploreHidden;
     private static void HideExploredMap()
     {
+        if (WaypointsPlugin._hideMapData.Value is WaypointsPlugin.Toggle.Off) return;
         if (!Game.m_noMap) return;
         explored = Minimap.instance.m_explored;
         otherExplored = Minimap.instance.m_exploredOthers;

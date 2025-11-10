@@ -10,7 +10,7 @@
         <AppDesignerFolder>Properties</AppDesignerFolder>
         <RootNamespace>Waypoints</RootNamespace>
         <AssemblyName>Waypoints</AssemblyName>
-        <TargetFrameworkVersion>v4.6.2</TargetFrameworkVersion>
+        <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
         <FileAlignment>512</FileAlignment>
         <LangVersion>10</LangVersion>
         <Nullable>enable</Nullable>
@@ -84,12 +84,18 @@
         <Reference Include="SoftReferenceableAssets">
           <HintPath>..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Data\Managed\publicized_assemblies\SoftReferenceableAssets_publicized.dll</HintPath>
         </Reference>
+        <Reference Include="Splatform">
+          <HintPath>..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Data\Managed\publicized_assemblies\Splatform_publicized.dll</HintPath>
+        </Reference>
         <Reference Include="System" />
         <Reference Include="System.Core" />
         <Reference Include="System.Data" />
         <Reference Include="System.Xml" />
         <Reference Include="UnityEngine">
             <HintPath>$(CorlibPath)\UnityEngine.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEngine.AnimationModule">
+          <HintPath>..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Data\Managed\UnityEngine.AnimationModule.dll</HintPath>
         </Reference>
         <Reference Include="UnityEngine.AssetBundleModule">
             <HintPath>$(CorlibPath)\UnityEngine.AssetBundleModule.dll</HintPath>
@@ -121,6 +127,7 @@
     </ItemGroup>
     <ItemGroup>
         <Compile Include="Behaviors\GlowTrails.cs" />
+        <Compile Include="Behaviors\WayFlight.cs" />
         <Compile Include="Behaviors\Waypoint.cs" />
         <Compile Include="Managers\AssetLoaderManager.cs" />
         <Compile Include="Managers\LocalizationManager.cs" />
@@ -134,10 +141,8 @@
         <Compile Include="VersionHandshake.cs" />
     </ItemGroup>
     <ItemGroup>
-        <EmbeddedResource Include="..\..\..\VALHEIM RIPPED\ashland rip\AshlandRIP\AssetBundles\StandaloneWindows\waypointbundle">
-          <Link>assets\waypointbundle</Link>
-        </EmbeddedResource>
         <Content Include=".gitignore" />
+        <EmbeddedResource Include="assets\waypointbundle_rs" />
         <Content Include="environment.props" />
         <Content Include="ILRepack.targets" />
         <Content Include="Libs\ServerSync.dll">
@@ -145,6 +150,11 @@
         </Content>
         <EmbeddedResource Include="translations\English.yml" />
         <EmbeddedResource Include="translations\Portuguese_Brazilian.yml" />
+        <Content Include="Thunderstore\CHANGELOG.md" />
+        <Content Include="Thunderstore\icon.png" />
+        <Content Include="Thunderstore\manifest.json" />
+        <Content Include="Thunderstore\README.md" />
+        <Content Include="Thunderstore\Waypoints.dll" />
         <Content Include="UpdateManifest.ps1" />
     </ItemGroup>
     <ItemGroup>

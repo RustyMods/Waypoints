@@ -87,7 +87,7 @@ public static class WaypointManager
     {
         private static void Postfix()
         {
-            Terminal.ConsoleCommand commands = new("waypoint", "Use help to list commands",
+            Terminal.ConsoleCommand commands = new("waaypoint", "Use help to list commands",
                 (Terminal.ConsoleEventFailable)(
                     args =>
                     {
@@ -110,6 +110,7 @@ public static class WaypointManager
                                 LocationManager.Generate(int.TryParse(args[2], out int quantity) ? quantity : 10);
                                 break;
                             case "remove":
+                                if (args.Length < 3) return false;
                                 if (args[2] == "all")
                                 {
                                     LocationManager.Remove(1, true);
