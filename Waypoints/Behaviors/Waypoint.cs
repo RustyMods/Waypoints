@@ -12,6 +12,71 @@ using YamlDotNet.Serialization;
 
 namespace Waypoints.Behaviors;
 
+public class WaypointVars
+{
+    public static readonly int RecordedPlayers = "RustyMods.Waypoints.Players".GetStableHashCode();
+}
+
+public static class WaypointExt
+{
+    private static readonly string WAYPOINT_CUSTOMDATA = "WaypointShrineKeys";
+    
+    public static void SaveWaypoint(this Player player, Waypoint waypoint)
+    {
+        List<Vector3> data = player.GetWaypointData();
+        var position = waypoint.GetPosition();
+        if (IsMatchFound(data, position)) return;
+        ISerializer serializer = new SerializerBuilder().Build();
+        data.Add(position);
+        List<string> info = data.Select(FormatPosition).ToList();
+        player.m_customData[WAYPOINT_CUSTOMDATA] = serializer.Serialize(info);
+    }
+    
+    public static bool IsMatchFound(List<Vector3> list, Vector3 pos) => list.Any(position => MatchFound(position, pos));
+    public static bool MatchFound(Vector3 x, Vector3 y)
+    {
+        if ((int)x.x != (int)y.x) return false;
+        if ((int)x.y != (int)y.y) return false;
+        if ((int)x.z != (int)y.z) return false;
+        return true;
+    }
+
+    public static List<Vector3> GetWaypointData(this Player player)
+    {
+        if (!player.m_customData.TryGetValue(WAYPOINT_CUSTOMDATA, out string data) || string.IsNullOrEmpty(data)) return new();
+        try
+        {
+            IDeserializer deserializer = new DeserializerBuilder().Build();
+            List<string> list = deserializer.Deserialize<List<string>>(data);
+            List<Vector3> positions = new();
+            foreach (string? input in list)
+            {
+                if (!input.ParseStringVector(out Vector3 position)) continue;
+                positions.Add(position);
+            }
+            return positions;
+        }
+        catch
+        {
+            return new();
+        }
+    }
+    
+    public static string FormatPosition(Vector3 position) => $"{position.x}#{position.y}#{position.z}";
+    
+    public static bool ParseStringVector(this string input, out Vector3 output)
+    {
+        output = Vector3.zero;
+        string[] info = input.Split('#');
+        if (info.Length != 3) return false;
+        if (!float.TryParse(info[0], out float x)) return false;
+        if (!float.TryParse(info[1], out float y)) return false;
+        if (!float.TryParse(info[2], out float z)) return false;
+        output = new Vector3(x, y, z);
+        return true;
+    }
+}
+
 public class  Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
 {
     public static readonly int m_key = "WaypointShrine".GetStableHashCode();
@@ -35,7 +100,7 @@ public class  Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
     private bool m_particlesActive = true;
     private float m_intensity;
     
-    public static bool noMap = Game.m_noMap;
+    public HashSet<long> recordedPlayers = new();
 
 
     public void Awake()
@@ -45,12 +110,15 @@ public class  Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
         m_model = GetComponentInChildren<MeshRenderer>();
         m_light = GetComponentInChildren<Light>();
         SetEffects(false);
-        if (!m_nview) return;
+        if (!m_nview.IsValid()) return;
         m_nview.Register<string>(nameof(RPC_SetName), RPC_SetName);
         m_nview.Register<int>(nameof(RPC_AddCharge), RPC_AddCharge);
         m_nview.Register<int>(nameof(RPC_RemoveCharge), RPC_RemoveCharge);
-        if (!m_nview.IsValid()) return;
+        m_nview.Register(nameof(RPC_UpdateRecords), RPC_UpdateRecords);
         if (GetText().IsNullOrWhiteSpace()) SetText($"{WorldGenerator.instance.GetBiome(transform.position)} Waypoint");
+
+        recordedPlayers = GetRecordedPlayers();
+        
         long lastDecay = m_nview.GetZDO().GetLong(m_timerKey);
         if (lastDecay == 0L)
         {
@@ -74,7 +142,7 @@ public class  Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
         else
         {
             if (m_poi) SetEffects(true);
-            else SetEffects(IsMatchFound(GetPlayerCustomData(closestPlayer), GetPosition()) && CanTeleport(closestPlayer, false));
+            else SetEffects(IsKnown(closestPlayer) && CanTeleport(closestPlayer, false));
         }
     }
 
@@ -98,7 +166,7 @@ public class  Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
         }
     }
 
-    private int GetDecaySeconds() => WaypointsPlugin._chargeDecay.Value * 60;
+    private static int GetDecaySeconds() => WaypointsPlugin._chargeDecay.Value * 60;
 
     private int GetDecayAmount()
     {
@@ -197,7 +265,7 @@ public class  Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
         return true;
     }
 
-    private ItemDrop? GetChargeItem()
+    private static ItemDrop? GetChargeItem()
     {
         if (!ObjectDB.instance) return null;
         GameObject prefab = ObjectDB.instance.GetItemPrefab(WaypointsPlugin._chargeItem.Value);
@@ -210,7 +278,7 @@ public class  Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
         return prefab.TryGetComponent(out ItemDrop component) ? component : null;
     }
 
-    private Vector3 GetPosition() => m_nview.GetZDO().m_position;
+    public Vector3 GetPosition() => m_nview.GetZDO().m_position;
     private void SetParticles(bool active)
     {
         if (m_particlesActive == active) return;
@@ -259,7 +327,7 @@ public class  Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
                 if (!Teleport(waypoint.m_position)) return;
             }
         }
-        CloseMap();
+        Minimap.instance.SetMapMode(Minimap.MapMode.Small);
     }
 
     private static int GetCost(Waypoint waypoint, Vector3 pos)
@@ -300,12 +368,7 @@ public class  Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
         foreach (Minimap.PinData? pin in m_tempPins) Minimap.instance.RemovePin(pin);
         m_tempPins.Clear();
         m_currentWaypoint = null;
-    }
-
-    private static void CloseMap()
-    {
-        Minimap.instance.SetMapMode(Minimap.MapMode.Small);
-        MinimapUI.SetElement(true);
+        MinimapUI.ShowToggle(true);
     }
     
     private void AddPins(Player player)
@@ -317,7 +380,7 @@ public class  Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
 
     private void AddWaypointPins(Player player)
     {
-        List<Vector3> data = GetPlayerCustomData(player);
+        List<Vector3> data = player.GetWaypointData();
         if (data.Count == 0) return;
         HashSet<ZDO> destinations = WaypointManager.FindDestinations();
         foreach (ZDO? destination in destinations)
@@ -338,10 +401,10 @@ public class  Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
 
     private static void AddLocationPins()
     {
-        if (WaypointsPlugin._teleportToLocations.Value is WaypointsPlugin.Toggle.Off) return;
-        if (!Minimap.instance) return;
+        if (WaypointsPlugin._teleportToLocations.Value is WaypointsPlugin.Toggle.Off || !Minimap.instance) return;
         foreach (KeyValuePair<Vector3, Minimap.PinData> pin in Minimap.instance.m_locationPins)
         {
+            if (WaypointsPlugin._requireKnownLocation.Value is WaypointsPlugin.Toggle.On && !Minimap.instance.IsExplored(pin.Key)) continue;
             m_tempPins.Add(new Minimap.PinData()
             {
                 m_pos = pin.Value.m_pos,
@@ -374,58 +437,41 @@ public class  Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
         if ((int)x.z != (int)y.z) return false;
         return true;
     }
-    
-    private void SaveWaypoint()
+
+    public HashSet<long> GetRecordedPlayers()
     {
-        if (!Player.m_localPlayer) return;
-        List<Vector3> data = GetPlayerCustomData(Player.m_localPlayer);
-        if (IsMatchFound(data, GetPosition())) return;
-        ISerializer serializer = new SerializerBuilder().Build();
-        data.Add(m_nview.GetZDO().m_position);
-        List<string> info = data.Select(FormatPosition).ToList();
-        Player.m_localPlayer.m_customData[m_playerCustomDataKey] = serializer.Serialize(info);
-    }
-
-    public bool IsKnown(Player player) => IsMatchFound(GetPlayerCustomData(player), GetPosition());
-
-    public static string FormatPosition(Vector3 position) => $"{position.x}#{position.y}#{position.z}";
-
-    public static List<Vector3> GetPlayerCustomData(Player player)
-    {
-        if (!player.m_customData.TryGetValue(m_playerCustomDataKey, out string data)) return new();
-        if (data.IsNullOrWhiteSpace()) return new();
-        try
+        string? playerList = m_nview.GetZDO().GetString(WaypointVars.RecordedPlayers);
+        HashSet<string> list = playerList.Split(';').ToHashSet();
+        HashSet<long> output = new HashSet<long>();
+        foreach (string? id in list)
         {
-            IDeserializer deserializer = new DeserializerBuilder().Build();
-            List<string> list = deserializer.Deserialize<List<string>>(data);
-            List<Vector3> positions = new();
-            foreach (string? input in list)
-            {
-                if (!GetVector(input, out Vector3 position)) continue;
-                positions.Add(position);
-            }
-            return positions;
+            if (!long.TryParse(id, out long playerID)) continue;
+            output.Add(playerID);
         }
-        catch
-        {
-            return new();
-        }
-
+        return output;
     }
 
-    public static bool GetVector(string input, out Vector3 output)
+    public void RecordPlayer(Player player)
     {
-        output = Vector3.zero;
-        string[] info = input.Split('#');
-        if (info.Length != 3) return false;
-        if (!float.TryParse(info[0], out float x)) return false;
-        if (!float.TryParse(info[1], out float y)) return false;
-        if (!float.TryParse(info[2], out float z)) return false;
-        output = new Vector3(x, y, z);
-        return true;
+        recordedPlayers.Add(player.GetPlayerID());
+        if (!m_nview.IsValid()) return;
+        m_nview.GetZDO().Set(WaypointVars.RecordedPlayers, string.Join(";", recordedPlayers.Select(x => x.ToString())));
+        m_nview.InvokeRPC(ZNetView.Everybody, nameof(RPC_UpdateRecords));
     }
 
-    private bool CanRename()
+    public void RPC_UpdateRecords(long sender)
+    {
+        recordedPlayers = GetRecordedPlayers();
+    }
+
+    public bool IsKnown(Player player)
+    {        
+        string? playerList = m_nview.GetZDO().GetString(WaypointVars.RecordedPlayers);
+        string[] list = playerList.Split(';');
+        return list.Contains(player.GetPlayerID().ToString());
+    }
+
+    private static bool CanRename()
     {
         if (WaypointsPlugin._onlyAdminRenames.Value is WaypointsPlugin.Toggle.Off) return true;
         return ZNet.m_instance.LocalPlayerIsAdminOrHost();
@@ -433,7 +479,10 @@ public class  Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
 
     public bool Interact(Humanoid user, bool hold, bool alt)
     {
-        SaveWaypoint();
+        if (user is not Player player) return false;
+        player.SaveWaypoint(this);
+        RecordPlayer(player);
+        
         if (hold) return false;
         if (alt)
         {
@@ -441,7 +490,6 @@ public class  Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
         }
         else
         {
-            if (user is not Player player) return false;
             if (!CanTeleport(player))
             {
                 return false;
@@ -455,13 +503,12 @@ public class  Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
     {
         if (user is not Player player || !Minimap.instance) return;
         HideExploredMap();
-        noMap = Game.m_noMap;
         Game.m_noMap = false;
         m_teleporting = true;
         AddPins(player);
         Minimap.instance.ShowPointOnMap(transform.position);
         m_currentWaypoint = this;
-        MinimapUI.SetElement(false);
+        // MinimapUI.ShowToggle(false);
     }
 
     public bool UseItem(Humanoid user, ItemDrop.ItemData item)
@@ -583,7 +630,6 @@ public class  Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
         [UsedImplicitly]
         private static void Prefix(Minimap.MapMode mode)
         {
-            
             if (mode is not Minimap.MapMode.Large)
             {
                 Game.m_noMap = ZoneSystem.instance && ZoneSystem.instance.GetGlobalKey(GlobalKeys.NoMap) || Player.m_localPlayer != null && PlayerPrefs.GetFloat("mapenabled_" + Player.m_localPlayer.GetPlayerName(), 1f) == 0.0;

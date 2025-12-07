@@ -20,7 +20,7 @@ namespace Waypoints
     public class WaypointsPlugin : BaseUnityPlugin
     {
         internal const string ModName = "Waypoints";
-        internal const string ModVersion = "1.1.6";
+        internal const string ModVersion = "1.1.8";
         internal const string Author = "RustyMods";
         private const string ModGUID = Author + "." + ModName;
         private static readonly string ConfigFileName = ModGUID + ".cfg";
@@ -56,13 +56,15 @@ namespace Waypoints
         public static ConfigEntry<float> _connectionMaxRange = null!;
         public static readonly Dictionary<string, ConfigEntry<string>> keyConfigs = new();
         public static ConfigEntry<Toggle> _hideMapData = null!;
+        public static ConfigEntry<Toggle> _requireKnownLocation = null!;
+        public static ConfigEntry<float> _minDistanceFromSimilar = null!;
 
         public void LoadConfigs()
         {
             _serverConfigLocked = config("1 - General", "Lock Configuration", Toggle.On, "If on, the configuration is locked and can be changed by server admins only.");
             _ = ConfigSync.AddLockingConfigEntry(_serverConfigLocked);
             _generateLocations = config("2 - Settings", "0 - Locations", Toggle.On, "If on, waypoints will generate along side game locations");
-            _locationAmount = config("2 - Settings", "1 - Amount", 200, "Set amount of waypoint locations to attempt to generate");
+            _locationAmount = config("2 - Settings", "1 - Amount", 500, "Set amount of waypoint locations to attempt to generate");
             _onlyAdminRenames = config("2 - Settings", "2 - Only Admin Renames", Toggle.Off, "If on, only admins can rename waypoints");
             _TeleportAnything = config("2 - Settings", "3 - Teleport Anything", Toggle.Off, "If on, player can teleport non-teleportable items");
             _UseKeys = config("2 - Settings", "4 - Use Keys", Toggle.Off, "If on, portal checks if game has global key to allow teleportation of non-teleportable items");
@@ -82,6 +84,10 @@ namespace Waypoints
             _connectionMaxRange = config("4 - Trails", "Max Range", 100f, "Set max range for trails to start appearing");
             _hideMapData = config("2 - Settings", "8 - Hide Map Data", Toggle.Off,
                 "If on, while playing no-map, map data gets hidden when map open");
+            _requireKnownLocation = config("2 - Settings", "Require Known Location", Toggle.Off,
+                "If on, location pins must be in explored area to use");
+            _minDistanceFromSimilar = config("2 - Settings", "Min Distance", 1000f,
+                "Set minimum distance waypoints can spawn near each other");
         }
         private static AssetBundle GetAssetBundle(string fileName)
         {
@@ -91,7 +97,9 @@ namespace Waypoints
             return AssetBundle.LoadFromStream(stream);
         }
 
-        private void LoadPieces()
+        public static bool IsWaypoint(string name) => name.Replace("(Clone)",string.Empty).Contains("WaypointShrine");
+
+        private static void LoadPieces()
         {
             BuildPiece Waypoint = new BuildPiece(_assetBundle, "WaypointShrine");
             Waypoint.Name.English("Waypoint Shrine");
@@ -106,10 +114,7 @@ namespace Waypoints
             Waypoint.DestroyedEffects = new() { "vfx_RockDestroyed", "sfx_rock_destroyed" };
             Waypoint.HitEffects = new() { "vfx_RockHit" };
             Waypoint.SwitchEffects = new() { "vfx_Place_throne02" };
-            Waypoint.SpecialProperties = new SpecialProperties()
-            {
-                AdminOnly = true,
-            };
+            Waypoint.SpecialProperties.AdminOnly = true;
             
             BuildPiece WaypointPortal = new BuildPiece(_assetBundle, "WaypointShrinePortal");
             WaypointPortal.Name.English("Waypoint Portal");

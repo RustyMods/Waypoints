@@ -15,8 +15,9 @@ public static class WaypointManager
     private static readonly List<ZDO> m_tempZDOs = new();
     private static readonly List<string> m_prefabsToSearch = new();
     public static bool m_teleportToUnplaced;
+    private static readonly WaitForSeconds interval = new(10f);
 
-    private static readonly CustomSyncedValue<List<string>> m_locationWaypoints = new CustomSyncedValue<List<string>>(WaypointsPlugin.ConfigSync, "CustomSyncedWaypointsData", new());
+    private static readonly CustomSyncedValue<string> m_locationWaypoints = new (WaypointsPlugin.ConfigSync, "CustomSyncedWaypointsData", "");
     public static void AddPrefabToSearch(string prefabName)
     {
         if (m_prefabsToSearch.Contains(prefabName)) return;
@@ -45,16 +46,15 @@ public static class WaypointManager
                 ZDOMan.instance.ForceSendZDO(zdo.m_uid);
             }
 
-            yield return new WaitForSeconds(10f);
+            yield return interval;
         }
     }
     public static void UpdateServerLocationData(ZoneSystem __instance)
     {
         if (!ZNet.instance || !ZNet.instance.IsServer()) return;
         List<ZoneSystem.LocationInstance> waypoints = __instance.GetLocationList().Where(location => location.m_location.m_prefab.Name.ToLower().Contains("waypoint")).ToList();
-        List<string> data = waypoints.Select(waypoint => Waypoint.FormatPosition(waypoint.m_position)).ToList();
-        m_locationWaypoints.Value = data;
-        WaypointsPlugin.WaypointsLogger.LogDebug($"Registered {data.Count} waypoint locations on the server");
+        m_locationWaypoints.Value = string.Join(";", waypoints.Select(waypoint => WaypointExt.FormatPosition(waypoint.m_position)));
+        WaypointsPlugin.WaypointsLogger.LogDebug($"Registered {waypoints.Count} waypoint locations on the server");
     }
     public static ZDO? GetDestination(Vector3 position) => FindDestinations().ToList().Find(x => Waypoint.MatchFound(x.m_position, position));
     public static HashSet<ZDO> FindDestinations()
@@ -161,19 +161,20 @@ public static class WaypointManager
             foreach (ZoneSystem.LocationInstance waypoint in waypoints)
             {
                 if (waypoint.m_placed) continue;
-                if (Waypoint.IsMatchFound(Waypoint.GetPlayerCustomData(Player.m_localPlayer), waypoint.m_position)) continue;
-                Waypoint.m_tempPins.Add(Minimap.instance.AddPin(waypoint.m_position, Minimap.PinType.Icon4, Waypoint.FormatPosition(waypoint.m_position), false, false));
+                if (Waypoint.IsMatchFound(Player.m_localPlayer.GetWaypointData(), waypoint.m_position)) continue;
+                Waypoint.m_tempPins.Add(Minimap.instance.AddPin(waypoint.m_position, Minimap.PinType.Icon4, WaypointExt.FormatPosition(waypoint.m_position), false, false));
                 ++count;
             }
         }
         else
         {
-            if (m_locationWaypoints.Value.Count == 0) return;
-            foreach (var position in m_locationWaypoints.Value)
+            if (string.IsNullOrEmpty(m_locationWaypoints.Value)) return;
+            string[] list = m_locationWaypoints.Value.Split(';');
+            foreach (string position in list)
             {
-                if (!Waypoint.GetVector(position, out Vector3 pos)) continue;
-                if (Waypoint.IsMatchFound(Waypoint.GetPlayerCustomData(Player.m_localPlayer), pos)) continue;
-                Waypoint.m_tempPins.Add(Minimap.instance.AddPin(pos, Minimap.PinType.Icon4, Waypoint.FormatPosition(pos), false, false));
+                if (!position.ParseStringVector(out Vector3 pos)) continue;
+                if (Waypoint.IsMatchFound(Player.m_localPlayer.GetWaypointData(), pos)) continue;
+                Waypoint.m_tempPins.Add(Minimap.instance.AddPin(pos, Minimap.PinType.Icon4, WaypointExt.FormatPosition(pos), false, false));
                 ++count;
             }
         }
@@ -184,7 +185,7 @@ public static class WaypointManager
     {
         if (!Player.m_localPlayer) return;
         int count = 0;
-        List<Vector3> data = Waypoint.GetPlayerCustomData(Player.m_localPlayer);
+        List<Vector3> data = Player.m_localPlayer.GetWaypointData();
         foreach (ZDO destination in FindDestinations())
         {
             if (Waypoint.IsMatchFound(data, destination.m_position)) continue;
@@ -195,7 +196,7 @@ public static class WaypointManager
         if (count > 0)
         {
             ISerializer serializer = new SerializerBuilder().Build();
-            Player.m_localPlayer.m_customData[Waypoint.m_playerCustomDataKey] = serializer.Serialize(data.Select(Waypoint.FormatPosition).ToList());
+            Player.m_localPlayer.m_customData[Waypoint.m_playerCustomDataKey] = serializer.Serialize(data.Select(WaypointExt.FormatPosition).ToList());
             WaypointsPlugin.WaypointsLogger.LogInfo($"Recorded {count} waypoints");
             return;
         }
@@ -218,15 +219,15 @@ public static class WaypointManager
     private static void ListKnownWaypoints()
     {
         if (!Player.m_localPlayer) return;
-        foreach (Vector3 position in Waypoint.GetPlayerCustomData(Player.m_localPlayer))
+        foreach (Vector3 position in Player.m_localPlayer.GetWaypointData())
         {
             ZDO? zdo = GetDestination(position);
             if (zdo == null)
             {
-                WaypointsPlugin.WaypointsLogger.LogInfo(Waypoint.FormatPosition(position));
+                WaypointsPlugin.WaypointsLogger.LogInfo(WaypointExt.FormatPosition(position));
                 continue;
             }
-            WaypointsPlugin.WaypointsLogger.LogInfo($"{zdo.GetString(Waypoint.m_key)} : {Waypoint.FormatPosition(position)}");
+            WaypointsPlugin.WaypointsLogger.LogInfo($"{zdo.GetString(Waypoint.m_key)} : {WaypointExt.FormatPosition(position)}");
         }
     }
 

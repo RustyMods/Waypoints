@@ -19,8 +19,12 @@ public class GlowTrails : MonoBehaviour
     
     private Waypoint m_waypoint = null!;
     private ZNetView m_nview = null!;
-    private readonly Dictionary<Player, GameObject> m_connections = new();
+    private readonly Dictionary<long, GameObject> m_connections = new();
     private Vector3 m_topPoint;
+    private float m_timer;
+    private float m_updateInterval = 0.05f;
+    public HashSet<long> m_playersToRemove = new();
+    
 
     public void Awake()
     {
@@ -32,15 +36,20 @@ public class GlowTrails : MonoBehaviour
     public void Update()
     {
         if (!m_nview.IsValid()) return;
+        
         if (WaypointsPlugin._showConnectionTrails.Value is WaypointsPlugin.Toggle.Off)
         {
-            OnDestroy();
+            RemoveAllConnections();
             return;
         }
         
+        m_timer += Time.deltaTime;
+        if (m_timer < m_updateInterval) return;
+        m_timer = 0.0f;
+        
         foreach (Player player in Player.GetAllPlayers())
         {
-            var distance = Vector3.Distance(player.transform.position, transform.position);
+            float distance = Vector3.Distance(player.transform.position, transform.position);
             if (distance > WaypointsPlugin._connectionMaxRange.Value || m_waypoint.IsKnown(player))
             {
                 RemoveConnection(player);
@@ -50,25 +59,43 @@ public class GlowTrails : MonoBehaviour
                 UpdateConnection(player);
             }
         }
+        
+        m_playersToRemove.Clear();
+        foreach (KeyValuePair<long, GameObject> kvp in m_connections)
+        {
+            if (Player.GetPlayer(kvp.Key) is null) m_playersToRemove.Add(kvp.Key);
+        }
+
+        foreach (long id in m_playersToRemove)
+        {
+            if (m_connections.TryGetValue(id, out GameObject connection))
+            {
+                if(connection is not null) Destroy(connection);
+            }
+            m_connections.Remove(id);
+        }
+        
     }
 
-    public void OnDestroy()
+    public void OnDestroy() => RemoveAllConnections();
+
+    public void RemoveAllConnections()
     {
-        foreach (KeyValuePair<Player, GameObject> kvp in m_connections) Destroy(kvp.Value);
+        foreach (KeyValuePair<long, GameObject> kvp in m_connections) Destroy(kvp.Value);
         m_connections.Clear();
     }
 
     private void RemoveConnection(Player player)
     {
-        if (!m_connections.TryGetValue(player, out GameObject connection)) return;
+        if (!m_connections.TryGetValue(player.GetPlayerID(), out GameObject connection)) return;
         Destroy(connection);
-        m_connections.Remove(player);
+        m_connections.Remove(player.GetPlayerID());
     }
     
     private void UpdateConnection(Player player)
     {
         if (m_connectionPrefab is null) return;
-        if (!m_connections.TryGetValue(player, out GameObject connection))
+        if (!m_connections.TryGetValue(player.GetPlayerID(), out GameObject connection))
         {
             connection = Instantiate(m_connectionPrefab, player.GetCenterPoint(), Quaternion.identity);
         }
@@ -77,6 +104,6 @@ public class GlowTrails : MonoBehaviour
         connection.transform.position = player.GetCenterPoint(); 
         connection.transform.rotation = quaternion;
         connection.transform.localScale = new Vector3(1f, 1f, vector3.magnitude);
-        m_connections[player] = connection;
+        m_connections[player.GetPlayerID()] = connection;
     }
 }

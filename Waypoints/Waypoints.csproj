@@ -127,7 +127,6 @@
     </ItemGroup>
     <ItemGroup>
         <Compile Include="Behaviors\GlowTrails.cs" />
-        <Compile Include="Behaviors\WayFlight.cs" />
         <Compile Include="Behaviors\Waypoint.cs" />
         <Compile Include="Managers\AssetLoaderManager.cs" />
         <Compile Include="Managers\LocalizationManager.cs" />

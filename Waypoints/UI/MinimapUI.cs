@@ -71,7 +71,7 @@ public static class MinimapUI
         }
     }
 
-    public static void SetElement(bool active) => m_element.SetActive(active);
+    public static void ShowToggle(bool active) => m_element.SetActive(active);
 
     private static bool GetSavedToggle()
     {
@@ -113,7 +113,7 @@ public static class MinimapUI
     {
         if (!Player.m_localPlayer || !Minimap.instance) return;
         foreach (Minimap.PinData pin in m_mapPins) Minimap.instance.RemovePin(pin);
-        List<Vector3> data = Waypoint.GetPlayerCustomData(Player.m_localPlayer);
+        List<Vector3> data = Player.m_localPlayer.GetWaypointData();
         HashSet<ZDO> destinations = WaypointManager.FindDestinations();
         foreach (ZDO? destination in destinations)
         {

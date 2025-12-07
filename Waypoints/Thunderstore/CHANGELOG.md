@@ -1,5 +1,7 @@
 ## Changelog
 ```
+1.1.8 - added config to have to know location area before being able to teleport to it, always showing map toggle to avoid problem of it dissappearing
+1.1.7 - increased interval for glow trails to improve performance
 1.1.6 - updated server sync
 1.1.5 - Fixed no map
 1.1.4 - Fixed glow trails error

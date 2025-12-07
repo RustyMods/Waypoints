@@ -153,7 +153,7 @@ public class LocationManager
         WaypointLocation.m_data.m_group = "Waypoints";
         WaypointLocation.m_data.m_prefabName = "WaypointLocation";
         WaypointLocation.m_data.m_prioritized = false;
-        WaypointLocation.m_data.m_minDistanceFromSimilar = 1000f;
+        WaypointLocation.m_data.m_minDistanceFromSimilar = WaypointsPlugin._minDistanceFromSimilar.Value;
         WaypointLocation.m_data.m_surroundCheckVegetation = true;
         WaypointLocation.m_data.m_surroundCheckDistance = 10f;
         
