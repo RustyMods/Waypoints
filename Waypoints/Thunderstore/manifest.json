@@ -1,6 +1,6 @@
 {
 	"name": "Waypoints",
-	"version_number": "1.1.8",
+	"version_number": "1.1.9",
 	"website_url": "https://github.com/RustyMods/Waypoints/tree/main",
 	"description": "Teleportation waypoints generate around the world",
 	"dependencies": [
