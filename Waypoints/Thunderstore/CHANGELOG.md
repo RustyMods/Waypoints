@@ -1,3 +1,7 @@
+## 1.2.0
+- changed command to check if devcommands is on instead of nocost
+- added config to keep trails active even if waypoint is known
+
 ## 1.1.9
 - exposed minimum distance as config
 

@@ -133,6 +133,7 @@
         <Compile Include="Managers\LocationManager.cs" />
         <Compile Include="Managers\MaterialReplacer.cs" />
         <Compile Include="Managers\PieceManager.cs" />
+        <Compile Include="Managers\StringList.cs" />
         <Compile Include="Managers\WaypointManager.cs" />
         <Compile Include="Plugin.cs" />
         <Compile Include="Properties\AssemblyInfo.cs" />

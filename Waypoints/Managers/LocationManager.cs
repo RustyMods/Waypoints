@@ -34,17 +34,19 @@ public class LocationManager
         var data = WaypointLocation.GetLocation();
         if (data.m_prefab.IsValid) __instance.m_locations.Add(data);
     }
-    public static int Generate(int quantity)
+    public static int Generate(int quantity, Terminal? context = null)
     {
         if (!ZNet.instance || !ZoneSystem.instance) return 0;
-        if (Player.m_localPlayer && !Player.m_localPlayer.NoCostCheat())
+        if (!Terminal.m_cheat)
         {
-            WaypointsPlugin.WaypointsLogger.LogInfo("Admin only, activate no cost mode");
+            WaypointsPlugin.WaypointsLogger.LogInfo("Admin only, activate devcommands");
+            context?.AddString("Admin only, activate devcommands");
             return 0;
         }
         if (!ZNet.instance.IsServer())
         {
             WaypointsPlugin.WaypointsLogger.LogInfo("Host Only, sending message to server to generate");
+            context?.AddString("Host Only, sending message to server to generate");
             GenerateSync.Value = "Generate:" + quantity;
             return 0;
         }
@@ -84,6 +86,7 @@ public class LocationManager
             ++count;
         }
         WaypointsPlugin.WaypointsLogger.LogInfo($"Generated {count} new locations");
+        context?.AddString($"Generated {count} new locations");
         return count;
     }
 
@@ -103,8 +106,9 @@ public class LocationManager
             return 0;
         }
 
-        var locations = ZoneSystem.instance.GetLocationList()
-            .Where(location => location.m_location.m_prefab.Name.ToLower().Contains("waypoint")).ToList();
+        List<ZoneSystem.LocationInstance> locations = ZoneSystem.instance.GetLocationList()
+            .Where(location => location.m_location.m_prefab.Name.ToLower().Contains("waypoint"))
+            .ToList();
         List<Vector2i> KeysToRemove = new();
         if (all)
         {
@@ -147,16 +151,21 @@ public class LocationManager
     
     public static void SetupWayShrineLocation()
     {
-        WaypointLocation = new("WaypointLocation", WaypointsPlugin._assetBundle, "WaypointShrine");
-        WaypointLocation.m_data.m_biome = Heightmap.Biome.All;
-        WaypointLocation.m_data.m_quantity = WaypointsPlugin._locationAmount.Value;
-        WaypointLocation.m_data.m_group = "Waypoints";
-        WaypointLocation.m_data.m_prefabName = "WaypointLocation";
-        WaypointLocation.m_data.m_prioritized = false;
-        WaypointLocation.m_data.m_minDistanceFromSimilar = WaypointsPlugin._minDistanceFromSimilar.Value;
-        WaypointLocation.m_data.m_surroundCheckVegetation = true;
-        WaypointLocation.m_data.m_surroundCheckDistance = 10f;
-        
+        WaypointLocation = new("WaypointLocation", WaypointsPlugin._assetBundle, "WaypointShrine")
+        {
+            m_data =
+            {
+                m_biome = Heightmap.Biome.All,
+                m_quantity = WaypointsPlugin._locationAmount.Value,
+                m_group = "Waypoints",
+                m_prefabName = "WaypointLocation",
+                m_prioritized = false,
+                m_minDistanceFromSimilar = WaypointsPlugin._minDistanceFromSimilar.Value,
+                m_surroundCheckVegetation = true,
+                m_surroundCheckDistance = 10f
+            }
+        };
+
         GenerateSync.ValueChanged += () =>
         {
             if (!ZNet.instance || !ZoneSystem.instance) return;

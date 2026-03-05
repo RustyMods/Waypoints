@@ -251,9 +251,15 @@ public class  Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
             return false;
             
         }
+
+        var blacklist = new StringList(WaypointsPlugin._teleportBlacklist.Value).list;
         foreach (ItemDrop.ItemData? itemData in player.GetInventory().m_inventory)
         {
-            if (itemData.m_shared.m_teleportable) continue;
+            if (itemData.m_shared.m_teleportable)
+            {
+                if (itemData.m_dropPrefab != null && blacklist.Contains(itemData.m_dropPrefab.name)) return false;
+                continue;
+            }
             if (!WaypointsPlugin.keyConfigs.TryGetValue(itemData.m_shared.m_name, out ConfigEntry<string> config)) continue;
             if (config.Value.IsNullOrWhiteSpace()) return false;
             if (ZoneSystem.instance.GetGlobalKey(config.Value)) continue;

@@ -50,7 +50,7 @@ public class GlowTrails : MonoBehaviour
         foreach (Player player in Player.GetAllPlayers())
         {
             float distance = Vector3.Distance(player.transform.position, transform.position);
-            if (distance > WaypointsPlugin._connectionMaxRange.Value || m_waypoint.IsKnown(player))
+            if (distance > WaypointsPlugin._connectionMaxRange.Value || (m_waypoint.IsKnown(player) && WaypointsPlugin._alwaysShowConnectionEffects.Value is WaypointsPlugin.Toggle.Off))
             {
                 RemoveConnection(player);
             }

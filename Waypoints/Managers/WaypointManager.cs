@@ -107,7 +107,7 @@ public static class WaypointManager
                                 RevealAllWaypoints(args);
                                 break;
                             case "generate":
-                                LocationManager.Generate(int.TryParse(args[2], out int quantity) ? quantity : 10);
+                                LocationManager.Generate(int.TryParse(args[2], out int quantity) ? quantity : 10, args.Context);
                                 break;
                             case "remove":
                                 if (args.Length < 3) return false;
@@ -117,7 +117,7 @@ public static class WaypointManager
                                 }
                                 else
                                 {
-                                    var amount = int.TryParse(args[2], out int count) ? count : 0;
+                                    int amount = int.TryParse(args[2], out int count) ? count : 0;
                                     LocationManager.Remove(amount);
                                 }
                                 break;

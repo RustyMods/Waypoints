@@ -20,7 +20,7 @@ namespace Waypoints
     public class WaypointsPlugin : BaseUnityPlugin
     {
         internal const string ModName = "Waypoints";
-        internal const string ModVersion = "1.1.9";
+        internal const string ModVersion = "1.2.0";
         internal const string Author = "RustyMods";
         private const string ModGUID = Author + "." + ModName;
         private static readonly string ConfigFileName = ModGUID + ".cfg";
@@ -58,6 +58,11 @@ namespace Waypoints
         public static ConfigEntry<Toggle> _hideMapData = null!;
         public static ConfigEntry<Toggle> _requireKnownLocation = null!;
         public static ConfigEntry<float> _minDistanceFromSimilar = null!;
+        public static ConfigEntry<Toggle> _alwaysShowConnectionEffects = null!;
+
+        public static ConfigEntry<string> _teleportBlacklist = null!;
+        //TODO: add teleport blacklist
+
 
         public void LoadConfigs()
         {
@@ -88,6 +93,12 @@ namespace Waypoints
                 "If on, location pins must be in explored area to use");
             _minDistanceFromSimilar = config("2 - Settings", "Min Distance", 1000f,
                 "Set minimum distance waypoints can spawn near each other");
+            _alwaysShowConnectionEffects = config("4 - Trails", "Always Show", Toggle.Off,
+                "If on, trails will not disappear if waypoint is known");
+
+            _teleportBlacklist = config("2 - Settings", "Blacklist", "",
+                new ConfigDescription("Add item ID to list that will prevent teleporting, ID separated by comma", null,
+                    StringList.attributes));
         }
         private static AssetBundle GetAssetBundle(string fileName)
         {
@@ -216,7 +227,7 @@ namespace Waypoints
             return config(group, name, value, new ConfigDescription(description), synchronizedSetting);
         }
 
-        private class ConfigurationManagerAttributes
+        public class ConfigurationManagerAttributes
         {
             [UsedImplicitly] public int? Order;
             [UsedImplicitly] public bool? Browsable;
