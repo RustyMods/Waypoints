@@ -263,4 +263,15 @@ public static class WaypointManager
         private static void Postfix() => WaypointsPlugin._Plugin.StopAllCoroutines();
     }
 
+    [HarmonyPatch(typeof(PieceTable), nameof(PieceTable.GetPiecesInSelectedCategory))]
+    private static class PieceTable_GetPiecesInSelectedCategory_Patch
+    {
+        private static void Postfix(ref List<Piece> __result)
+        {
+            if (WaypointsPlugin._removeVanillaPortals.Value is WaypointsPlugin.Toggle.Off) return;
+
+            __result.RemoveAll(p => p.GetComponent<TeleportWorld>());
+        }
+    }
+
 }

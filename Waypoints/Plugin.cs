@@ -20,7 +20,7 @@ namespace Waypoints
     public class WaypointsPlugin : BaseUnityPlugin
     {
         internal const string ModName = "Waypoints";
-        internal const string ModVersion = "1.2.0";
+        internal const string ModVersion = "1.2.1";
         internal const string Author = "RustyMods";
         private const string ModGUID = Author + "." + ModName;
         private static readonly string ConfigFileName = ModGUID + ".cfg";
@@ -61,6 +61,8 @@ namespace Waypoints
         public static ConfigEntry<Toggle> _alwaysShowConnectionEffects = null!;
 
         public static ConfigEntry<string> _teleportBlacklist = null!;
+
+        public static ConfigEntry<Toggle> _removeVanillaPortals = null!;
         //TODO: add teleport blacklist
 
 
@@ -95,6 +97,9 @@ namespace Waypoints
                 "Set minimum distance waypoints can spawn near each other");
             _alwaysShowConnectionEffects = config("4 - Trails", "Always Show", Toggle.Off,
                 "If on, trails will not disappear if waypoint is known");
+
+            _removeVanillaPortals = config("2 - Settings", "Disable Portals", Toggle.Off,
+                "If on, will remove vanilla portals from build menu");
 
             _teleportBlacklist = config("2 - Settings", "Blacklist", "",
                 new ConfigDescription("Add item ID to list that will prevent teleporting, ID separated by comma", null,

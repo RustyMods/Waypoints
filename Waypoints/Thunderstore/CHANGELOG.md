@@ -1,3 +1,6 @@
+## 1.2.1
+- added config to disable vanilla portals from build menu
+
 ## 1.2.0
 - changed command to check if devcommands is on instead of nocost
 - added config to keep trails active even if waypoint is known

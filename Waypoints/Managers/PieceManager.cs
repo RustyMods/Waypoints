@@ -401,7 +401,9 @@ public class BuildPiece
                 piece.activeTools = cfg.tools.Value.Split(',').Select(s => s.Trim()).ToArray();
                 cfg.tools.SettingChanged += (_, _) =>
                 {
+#pragma warning disable CS0618 // Type or member is obsolete
                     Inventory[] inventories = Player.s_players.Select(p => p.GetInventory()).Concat(Object.FindObjectsOfType<Container>().Select(c => c.GetInventory())).Where(c => c is not null).ToArray();
+#pragma warning restore CS0618 // Type or member is obsolete
                     Dictionary<string, List<PieceTable>> tools = ObjectDB.instance.m_items.Select(p => p.GetComponent<ItemDrop>()).Where(c => c && c.GetComponent<ZNetView>()).Concat(ItemDrop.s_instances).Select(i => new KeyValuePair<string, ItemDrop.ItemData>(Utils.GetPrefabName(i.gameObject), i.m_itemData)).Concat(inventories.SelectMany(i => i.GetAllItems()).Select(i => new KeyValuePair<string, ItemDrop.ItemData>(i.m_dropPrefab.name, i))).Where(kv => kv.Value.m_shared.m_buildPieces).GroupBy(kv => kv.Key).ToDictionary(g => g.Key, g => g.Select(kv => kv.Value.m_shared.m_buildPieces).Distinct().ToList());
 
                     foreach (string tool in piece.activeTools)
@@ -562,7 +564,9 @@ public class BuildPiece
                     {
                         Piece.Requirement[] requirements = SerializedRequirements.toPieceReqs(new SerializedRequirements(cfg.craft.Value));
                         piecePrefab.m_resources = requirements;
+#pragma warning disable CS0618 // Type or member is obsolete
                         foreach (Piece instantiatedPiece in Object.FindObjectsOfType<Piece>())
+#pragma warning restore CS0618 // Type or member is obsolete
                         {
                             if (instantiatedPiece.m_name == pieceName)
                             {
@@ -633,7 +637,9 @@ public class BuildPiece
                     {
                         Piece.Requirement[] requirements = SerializedRequirements.toPieceReqs(new SerializedRequirements(cfg.craft.Value));
                         piecePrefab.m_resources = requirements;
+#pragma warning disable CS0618 // Type or member is obsolete
                         foreach (Piece instantiatedPiece in Object.FindObjectsOfType<Piece>())
+#pragma warning restore CS0618 // Type or member is obsolete
                         {
                             if (instantiatedPiece.m_name == pieceName)
                             {
@@ -1296,7 +1302,9 @@ public class AdminSyncing
                 string pieceName = piecePrefab.m_name;
                 string localizedName = Localization.instance.Localize(pieceName).Trim();
                 if (!ObjectDB.instance || ObjectDB.instance.GetItemPrefab("YmirRemains") == null) continue;
+#pragma warning disable CS0618 // Type or member is obsolete
                 foreach (Piece instantiatedPiece in UnityEngine.Object.FindObjectsOfType<Piece>())
+#pragma warning restore CS0618 // Type or member is obsolete
                 {
                     if (admin)
                     {
