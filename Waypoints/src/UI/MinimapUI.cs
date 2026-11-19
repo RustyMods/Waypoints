@@ -2,16 +2,13 @@
 using HarmonyLib;
 using TMPro;
 using UnityEngine;
-using UnityEngine.UI;
-using Waypoints.Behaviors;
-using Waypoints.Managers;
 
-namespace Waypoints.UI;
+namespace Waypoints;
 
 public static class MinimapUI
 {
-    private static readonly List<Minimap.PinData> m_mapPins = new();
-    private static readonly string m_savedBoolKey = "PlayerCustomDataWaypointBool";
+    private static readonly List<Minimap.PinData> m_mapPins = [];
+    private const string PLAYER_CUSTOM_DATA_KEY = "PlayerCustomDataWaypointBool";
     private static bool m_show = true;
     private static bool m_enabled;
     private static GameObject m_element = null!;
@@ -27,13 +24,13 @@ public static class MinimapUI
             if (clone.transform is RectTransform rectTransform)
             {
                 rectTransform.anchoredPosition = new Vector2(-375f, 41f);
-                var config = WaypointsPlugin._Plugin.config("2 - Settings", "8 - Map Toggle Position", rectTransform.position, "Modify position of map toggle", false);
+                var config = ConfigManager.config("2 - Settings", "8 - Map Toggle Position", rectTransform.position, "Modify position of map toggle", false);
                 rectTransform.position = config.Value;
                 config.SettingChanged += (_, _) => rectTransform.position = config.Value;
             }
-            Toggle toggle = clone.GetComponentInChildren<Toggle>();
+            UnityEngine.UI.Toggle toggle = clone.GetComponentInChildren<UnityEngine.UI.Toggle>();
             toggle.onValueChanged.RemoveAllListeners();
-            toggle.onValueChanged = new Toggle.ToggleEvent();
+            toggle.onValueChanged = new UnityEngine.UI.Toggle.ToggleEvent();
             toggle.onValueChanged.AddListener(HandleToggle);
             
             Transform? text = Utils.FindChild(toggle.gameObject.transform, "Label");
@@ -76,7 +73,7 @@ public static class MinimapUI
     private static bool GetSavedToggle()
     {
         if (!Player.m_localPlayer) return false;
-        if (!Player.m_localPlayer.m_customData.TryGetValue(m_savedBoolKey, out string data)) return false;
+        if (!Player.m_localPlayer.m_customData.TryGetValue(PLAYER_CUSTOM_DATA_KEY, out string data)) return false;
         return bool.TryParse(data, out bool boolean) && boolean;
     }
 
@@ -90,7 +87,7 @@ public static class MinimapUI
     private static void SaveToggle(bool toggle)
     {
         if (!Player.m_localPlayer) return;
-        Player.m_localPlayer.m_customData[m_savedBoolKey] = toggle.ToString();
+        Player.m_localPlayer.m_customData[PLAYER_CUSTOM_DATA_KEY] = toggle.ToString();
     }
 
     private static void UpdatePins(bool show)
@@ -112,13 +109,22 @@ public static class MinimapUI
     private static void AddPinsToMap()
     {
         if (!Player.m_localPlayer || !Minimap.instance) return;
-        foreach (Minimap.PinData pin in m_mapPins) Minimap.instance.RemovePin(pin);
+        foreach (Minimap.PinData pin in m_mapPins)
+        {
+            Minimap.instance.RemovePin(pin);
+        }
         List<Vector3> data = Player.m_localPlayer.GetWaypointData();
         HashSet<ZDO> destinations = WaypointManager.FindDestinations();
         foreach (ZDO? destination in destinations)
         {
             if (!Waypoint.IsMatchFound(data, destination.m_position)) continue;
-            m_mapPins.Add(Minimap.instance.AddPin(destination.m_position, Minimap.PinType.Icon4, destination.GetString(Waypoint.m_key), false, false));
+            m_mapPins.Add(
+                Minimap.instance.AddPin(
+                    destination.m_position,
+                    Minimap.PinType.Icon4, 
+                    destination.GetString(Waypoint.m_key), 
+                    false, 
+                    false));
         }
 
         m_enabled = true;
@@ -126,7 +132,10 @@ public static class MinimapUI
     
     private static void ClearMapPins()
     {
-        foreach (Minimap.PinData pin in m_mapPins) Minimap.instance.RemovePin(pin);
+        foreach (Minimap.PinData pin in m_mapPins)
+        {
+            Minimap.instance.RemovePin(pin);
+        }
         m_enabled = false;
     }
 }

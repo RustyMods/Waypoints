@@ -3,7 +3,7 @@ using System.Linq;
 using BepInEx.Configuration;
 using UnityEngine;
 
-namespace Waypoints.Managers;
+namespace Waypoints;
 
 public class StringList
 {
@@ -82,7 +82,7 @@ public class StringList
         }
     }
     
-    public static readonly WaypointsPlugin.ConfigurationManagerAttributes attributes = new ()
+    public static readonly ConfigurationManagerAttributes attributes = new ()
     {
         CustomDrawer = Draw
     };

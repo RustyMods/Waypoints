@@ -2,7 +2,7 @@
 using HarmonyLib;
 using UnityEngine;
 
-namespace Waypoints.Behaviors;
+namespace Waypoints;
 
 public class GlowTrails : MonoBehaviour
 {
@@ -37,7 +37,7 @@ public class GlowTrails : MonoBehaviour
     {
         if (!m_nview.IsValid()) return;
         
-        if (WaypointsPlugin._showConnectionTrails.Value is WaypointsPlugin.Toggle.Off)
+        if (!Configs.ShowConnectionTrails)
         {
             RemoveAllConnections();
             return;
@@ -50,7 +50,7 @@ public class GlowTrails : MonoBehaviour
         foreach (Player player in Player.GetAllPlayers())
         {
             float distance = Vector3.Distance(player.transform.position, transform.position);
-            if (distance > WaypointsPlugin._connectionMaxRange.Value || (m_waypoint.IsKnown(player) && WaypointsPlugin._alwaysShowConnectionEffects.Value is WaypointsPlugin.Toggle.Off))
+            if (distance > Configs.ConnectionMaxRange || (m_waypoint.IsKnown(player) && !Configs.AlwaysShowConnectionEffects))
             {
                 RemoveConnection(player);
             }

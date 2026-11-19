@@ -7,13 +7,26 @@ using SoftReferenceableAssets;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
-namespace Waypoints.Managers;
+namespace Waypoints;
 
 public class AssetLoaderManager
 {
     private static BepInPlugin m_plugin = null!;
     private static readonly Dictionary<AssetID, AssetRef> m_assets = new();
     private static readonly Dictionary<string, AssetID> m_ids = new();
+
+    private static AssetLoaderManager? _instance;
+    public static AssetLoaderManager Instance
+    {
+        get
+        {
+            if (_instance == null)
+            {
+                _instance = new AssetLoaderManager(WaypointsPlugin.instance.Info.Metadata);
+            }
+            return _instance;
+        }
+    }
 
     static AssetLoaderManager()
     {
@@ -92,7 +105,7 @@ public class AssetLoaderManager
 
         m_ids[assetRef.asset.name] = assetID;
                 
-        WaypointsPlugin.WaypointsLogger.LogDebug($"Added prefab {assetRef.asset.name} with ID: {assetID} to AssetBundleLoader");
+        WaypointsPlugin.LogDebug($"Added prefab {assetRef.asset.name} with ID: {assetID} to AssetBundleLoader");
     }
 
     private AssetID? GetAssetID(string name) => m_ids.TryGetValue(name, out AssetID id) ? id : null;

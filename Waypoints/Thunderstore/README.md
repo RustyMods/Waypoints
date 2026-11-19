@@ -9,6 +9,10 @@ That way, at least you won't be able to see where you've explored, but you still
 in the world, relative to the axis.
 ```
 
+## Need a dedicated server ?
+use link: https://www.survivalservers.com/r/rustymods/valheim
+I get a 20% commission. Thanks
+
 ## Features
 
 - Randomly generated waypoints
@@ -21,14 +25,14 @@ in the world, relative to the axis.
 
 ## Commands
 
-Use 'waypoint' to use commands
+Use `wp` to use commands
 
-- help : list out commands
-- list : list current known waypoints
-- reset : clears player save file of recorded waypoints
-- reveal : admin only - adds all placed waypoints to player save and temporarily reveals all unplaced waypoints (locations)
-- generate [count] : admin only, no cost mode; sends message to server to generate new locations
-- remove [count / all] : admin only, no cost mode; sends message to server to try to remove locations
+- `wp help` : list out commands
+- `wp list` : list current known waypoints
+- `wp reset` : clears player save file of recorded waypoints
+- `wp reveal` : admin only - adds all placed waypoints to player save and temporarily reveals all unplaced waypoints (locations)
+- `wp generate [count]` : admin only, no cost mode; sends message to server to generate new locations
+- `wp remove [count / all]` : admin only, no cost mode; sends message to server to try to remove locations
 
 ![](https://i.imgur.com/Efg441C.png)
 

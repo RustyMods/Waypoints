@@ -5,7 +5,7 @@ using HarmonyLib;
 using JetBrains.Annotations;
 using UnityEngine;
 
-namespace Waypoints.Managers
+namespace Waypoints
 {
     [PublicAPI]
     public static class MaterialReplacer

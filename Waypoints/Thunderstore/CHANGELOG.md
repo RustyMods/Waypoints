@@ -1,3 +1,14 @@
+## 1.2.3
+- loading locations per biome individual to have finer control over placement
+- should fix issue placing waypoints in Ashlands & DeepNorth
+- updated commands to be more informative
+- start command changed to `wp`
+- added AdventureBackpacks API to check inside backpacks during teleportation check
+
+## 1.2.2
+- deepnorth update
+- updated server sync
+
 ## 1.2.1
 - added config to disable vanilla portals from build menu
 

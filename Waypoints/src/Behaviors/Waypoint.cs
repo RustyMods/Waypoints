@@ -1,18 +1,18 @@
-﻿using System.Collections.Generic;
+﻿using System.Collections;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using AdventureBackpacks.API.Client;
 using BepInEx;
 using BepInEx.Configuration;
 using HarmonyLib;
 using JetBrains.Annotations;
 using UnityEngine;
-using Waypoints.Managers;
-using Waypoints.UI;
 using YamlDotNet.Serialization;
 
-namespace Waypoints.Behaviors;
+namespace Waypoints;
 
-public class WaypointVars
+public static class WaypointVars
 {
     public static readonly int RecordedPlayers = "RustyMods.Waypoints.Players".GetStableHashCode();
 }
@@ -58,7 +58,7 @@ public static class WaypointExt
         }
         catch
         {
-            return new();
+            return [];
         }
     }
     
@@ -85,9 +85,10 @@ public class  Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
     private static readonly int m_timerKey = "WaypointTimer".GetStableHashCode();
     private static readonly int EmissionColor = Shader.PropertyToID("_EmissionColor");
     private static readonly Vector3 m_exitDistance = new Vector3(1f, 1f, 1f);
-    public static readonly List<Minimap.PinData> m_tempPins = new();
+    public static readonly List<Minimap.PinData> m_tempPins = [];
     private static Waypoint? m_currentWaypoint;
     public static bool m_teleporting;
+    
     public bool m_poi;
 
     private const float m_updateTime = 30f;
@@ -100,7 +101,7 @@ public class  Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
     private bool m_particlesActive = true;
     private float m_intensity;
     
-    public HashSet<long> recordedPlayers = new();
+    public HashSet<long> recordedPlayers = [];
 
 
     public void Awake()
@@ -125,8 +126,8 @@ public class  Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
             m_nview.GetZDO().Set(m_timerKey, (long)ZNet.instance.GetTimeSeconds());
         }
 
-        if (WaypointsPlugin._usesCharges.Value is WaypointsPlugin.Toggle.Off) return;
-        if (GetCurrentCharge() > 0 && WaypointsPlugin._Decays.Value is WaypointsPlugin.Toggle.On)
+        if (!Configs.UseChargingSystem) return;
+        if (GetCurrentCharge() > 0 && Configs.Decays)
         {
             InvokeRepeating(nameof(UpdateCharge), m_updateTime, m_updateTime);
         }
@@ -160,13 +161,13 @@ public class  Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
         if (!m_nview.IsValid()) return;
         int floor = GetDecayAmount();
         if (floor == 0) return;
-        if (!RemoveCharge(floor) || WaypointsPlugin._Decays.Value is WaypointsPlugin.Toggle.Off)
+        if (!RemoveCharge(floor) || !Configs.Decays)
         {
             m_nview.CancelInvoke(nameof(UpdateCharge));
         }
     }
 
-    private static int GetDecaySeconds() => WaypointsPlugin._chargeDecay.Value * 60;
+    private static int GetDecaySeconds() => Configs.ChargeDecay * 60;
 
     private int GetDecayAmount()
     {
@@ -182,7 +183,7 @@ public class  Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
     {
         if (!m_nview.IsValid()) return false;
         int currentCharge = GetCurrentCharge();
-        if (currentCharge >= WaypointsPlugin._chargeMax.Value) return false;
+        if (currentCharge >= Configs.MaxCharge) return false;
         m_nview.ClaimOwnership();
         m_nview.InvokeRPC(nameof(RPC_AddCharge), amount);
         return true;
@@ -195,11 +196,11 @@ public class  Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
         if (!ZNet.instance) return;
         if (!m_nview.IsValid()) return;
         int currentCharge = GetCurrentCharge();
-        if (currentCharge >= WaypointsPlugin._chargeMax.Value) return;
-        m_nview.GetZDO().Set(m_chargeKey, Mathf.Clamp(currentCharge + amount, 0, WaypointsPlugin._chargeMax.Value));
+        if (currentCharge >= Configs.MaxCharge) return;
+        m_nview.GetZDO().Set(m_chargeKey, Mathf.Clamp(currentCharge + amount, 0, Configs.MaxCharge));
         ResetTimer();
         CancelInvoke(nameof(UpdateCharge));
-        if (WaypointsPlugin._Decays.Value is WaypointsPlugin.Toggle.Off) return;
+        if (!Configs.Decays) return;
         InvokeRepeating(nameof(UpdateCharge), m_updateTime, m_updateTime);
     }
 
@@ -238,29 +239,41 @@ public class  Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
 
     private bool CanTeleport(Player player, bool message = true)
     {
-        if (GetCurrentCharge() - WaypointsPlugin._cost.Value < 0 && WaypointsPlugin._usesCharges.Value is WaypointsPlugin.Toggle.On)
+        if (Configs.UseChargingSystem && GetCurrentCharge() - Configs.Cost < 0)
         {
             if (message) player.Message(MessageHud.MessageType.Center, "$msg_chargerequired");
             return false;
         }
-        if (WaypointsPlugin._TeleportAnything.Value is WaypointsPlugin.Toggle.On) return true;
-        if (WaypointsPlugin._UseKeys.Value is WaypointsPlugin.Toggle.Off)
+        if (Configs.TeleportAnything) return true;
+        if (!Configs.UseKeys)
         {
-            if (player.IsTeleportable()) return true;
+            if (player.IsTeleportable(false)) return true;
             if (message) player.Message(MessageHud.MessageType.Center, "$msg_noteleport");
             return false;
             
         }
 
-        var blacklist = new StringList(WaypointsPlugin._teleportBlacklist.Value).list;
-        foreach (ItemDrop.ItemData? itemData in player.GetInventory().m_inventory)
+        var blacklist = Configs.TeleportBlacklist;
+
+        List<ItemDrop.ItemData> items = [];
+        items.AddRange(player.GetInventory().GetAllItems());
+
+        if (ABAPIClient.IsAvailable)
         {
+           items.AddRange(ABAPIClient.GetAllBackpackInventories(player).SelectMany(i => i.GetAllItems()));
+        }
+
+        for (var i = 0; i < items.Count; ++i)
+        {
+            var itemData = items[i];
             if (itemData.m_shared.m_teleportable)
             {
-                if (itemData.m_dropPrefab != null && blacklist.Contains(itemData.m_dropPrefab.name)) return false;
+                if (itemData.m_dropPrefab != null && 
+                    blacklist.Contains(itemData.m_dropPrefab.name)) return false;
                 continue;
             }
-            if (!WaypointsPlugin.keyConfigs.TryGetValue(itemData.m_shared.m_name, out ConfigEntry<string> config)) continue;
+
+            if (!Configs.keyConfigs.TryGetValue(itemData.m_shared.m_name, out ConfigEntry<string> config)) continue;
             if (config.Value.IsNullOrWhiteSpace()) return false;
             if (ZoneSystem.instance.GetGlobalKey(config.Value)) continue;
             if (player.HaveUniqueKey(config.Value)) continue;
@@ -274,7 +287,7 @@ public class  Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
     private static ItemDrop? GetChargeItem()
     {
         if (!ObjectDB.instance) return null;
-        GameObject prefab = ObjectDB.instance.GetItemPrefab(WaypointsPlugin._chargeItem.Value);
+        GameObject prefab = ObjectDB.instance.GetItemPrefab(Configs.ChargeItemID);
         if (!prefab)
         {
             prefab = ObjectDB.instance.GetItemPrefab("GreydwarfEye");
@@ -339,16 +352,16 @@ public class  Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
     private static int GetCost(Waypoint waypoint, Vector3 pos)
     {
         if (waypoint == null) return 1;
-        int cost = WaypointsPlugin._cost.Value;
-        if (WaypointsPlugin._useDistanceCharge.Value is WaypointsPlugin.Toggle.Off) return cost;
-        cost = Mathf.FloorToInt(Utils.DistanceXZ(pos, waypoint.GetPosition()) / WaypointsPlugin._distancePerCharge.Value);
+        int cost = Configs.Cost;
+        if (!Configs.UseDistanceChargeCalculation) return cost;
+        cost = Mathf.FloorToInt(Utils.DistanceXZ(pos, waypoint.GetPosition()) / Configs.DistancePerCharge);
         if (cost == 0) cost = 1;
         return cost;
     }
 
     private static bool Teleport(Vector3 pos, bool useCost = true)
     {
-        if (useCost && WaypointsPlugin._usesCharges.Value is WaypointsPlugin.Toggle.On)
+        if (useCost && Configs.UseChargingSystem)
         {
             if (m_currentWaypoint == null) return false;
             int cost = GetCost(m_currentWaypoint, pos);
@@ -361,9 +374,11 @@ public class  Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
             if (!m_currentWaypoint.RemoveCharge(cost)) return false;
         }
         Player.m_localPlayer.TeleportTo(pos + m_exitDistance, Player.m_localPlayer.transform.rotation, true);
-        if (WaypointsPlugin._TeleportTames.Value is WaypointsPlugin.Toggle.On)
+        if (Configs.TeleportTames)
         {
-            TeleportCharacters(GetTames(Player.m_localPlayer), pos, Quaternion.identity);
+            var characters = GetTames(Player.m_localPlayer);
+            TeleportCharacters(characters, pos, Quaternion.identity);
+
         }
         return true;
     }
@@ -395,7 +410,7 @@ public class  Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
             if (!IsMatchFound(data, destination.m_position) && destination.m_prefab != "WaypointShrinePortal".GetStableHashCode()) continue;
             string pinName = destination.GetString(m_key);
             bool flag = false;
-            if (WaypointsPlugin._usesCharges.Value is WaypointsPlugin.Toggle.On)
+            if (Configs.UseChargingSystem)
             {
                 int cost = GetCost(this, destination.m_position);
                 flag = cost > GetCurrentCharge();
@@ -407,10 +422,11 @@ public class  Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
 
     private static void AddLocationPins()
     {
-        if (WaypointsPlugin._teleportToLocations.Value is WaypointsPlugin.Toggle.Off || !Minimap.instance) return;
+        if (!Configs.CanTeleportToLocations) return;
+        if (!Minimap.instance) return;
         foreach (KeyValuePair<Vector3, Minimap.PinData> pin in Minimap.instance.m_locationPins)
         {
-            if (WaypointsPlugin._requireKnownLocation.Value is WaypointsPlugin.Toggle.On && !Minimap.instance.IsExplored(pin.Key)) continue;
+            if (Configs.RequireKnownLocation && !Minimap.instance.IsExplored(pin.Key)) continue;
             m_tempPins.Add(new Minimap.PinData()
             {
                 m_pos = pin.Value.m_pos,
@@ -422,7 +438,7 @@ public class  Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
 
     private static void AddCustomSpawnPin()
     {
-        if (WaypointsPlugin._teleportToBed.Value is WaypointsPlugin.Toggle.Off) return;
+        if (!Configs.CanTeleportToBeds) return;
         PlayerProfile? profile = Game.instance.GetPlayerProfile();
         if (profile.HaveCustomSpawnPoint())
         {
@@ -479,7 +495,7 @@ public class  Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
 
     private static bool CanRename()
     {
-        if (WaypointsPlugin._onlyAdminRenames.Value is WaypointsPlugin.Toggle.Off) return true;
+        if (!Configs.OnlyAdminRenames)  return true;
         return ZNet.m_instance.LocalPlayerIsAdminOrHost();
     }
 
@@ -519,10 +535,10 @@ public class  Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
 
     public bool UseItem(Humanoid user, ItemDrop.ItemData item)
     {
-        if (WaypointsPlugin._usesCharges.Value is WaypointsPlugin.Toggle.Off) return false;
+        if (!Configs.UseChargingSystem) return false;
         if (GetChargeItem()?.m_itemData.m_shared.m_name != item.m_shared.m_name) return false;
         int stack = item.m_stack;
-        int max = WaypointsPlugin._chargeMax.Value - GetCurrentCharge();
+        int max = Configs.MaxCharge - GetCurrentCharge();
         if (stack > max)
         {
             if (!AddCharge(max))
@@ -556,17 +572,31 @@ public class  Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
 
     public string GetHoverText()
     {
-        StringBuilder stringBuilder = new StringBuilder();
-        stringBuilder.Append(GetText() + "\n");
-        if (WaypointsPlugin._usesCharges.Value is WaypointsPlugin.Toggle.On) 
-            stringBuilder.AppendFormat("{0}: {1}/{2} \n", GetChargeItem()?.m_itemData.m_shared.m_name, GetCurrentCharge(), WaypointsPlugin._chargeMax.Value);
-        stringBuilder.AppendFormat("[<color=yellow>{0}</color>] {1}\n", "$KEY_Use", "$piece_use");
-        if (CanRename()) stringBuilder.AppendFormat("[<color=yellow>{0}</color>] {1}", "L.Shift + $KEY_Use", "$hud_rename");
+        StringBuilder sb = new StringBuilder();
+        sb.Append(GetText() + "\n");
         
-        return Localization.instance.Localize(stringBuilder.ToString());
+        if (Configs.UseChargingSystem)
+        {
+            sb.AppendFormat("{0}: {1}/{2} \n", 
+                GetChargeItem()?.m_itemData.m_shared.m_name, 
+                GetCurrentCharge(),
+                Configs.MaxCharge);
+        }
+        sb.AppendFormat("[<color=yellow>{0}</color>] {1}\n", 
+            "$KEY_Use", 
+            "$piece_use");
+        if (CanRename())
+        {
+            sb.AppendFormat("[<color=yellow>{0}</color>] {1}", 
+                "L.Shift + $KEY_Use", 
+                "$hud_rename");
+        }
+        
+        return Localization.instance.Localize(sb.ToString());
     }
 
     public string GetHoverName() => "$piece_waypoint";
+    public float GetHoverOffset() => 0f;
 
     private void RPC_SetName(long sender, string text)
     {
@@ -645,12 +675,12 @@ public class  Waypoint : MonoBehaviour, Interactable, Hoverable, TextReceiver
         }
     }
 
-    private static bool[]? explored;
-    private static bool[]? otherExplored;
+    private static BitArray? explored;
+    private static BitArray? otherExplored;
     private static bool ExploreHidden;
     private static void HideExploredMap()
     {
-        if (WaypointsPlugin._hideMapData.Value is WaypointsPlugin.Toggle.Off) return;
+        if (!Configs.HideMapData) return;
         if (!Game.m_noMap) return;
         explored = Minimap.instance.m_explored;
         otherExplored = Minimap.instance.m_exploredOthers;
